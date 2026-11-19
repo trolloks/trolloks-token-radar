@@ -64,11 +64,59 @@ const GROWTH_WEIGHT = 0.3;
 const DAY = 86_400_000;
 const round = (n: number, d = 4): number => Math.round(n * 10 ** d) / 10 ** d;
 
+/** One protocol's estimate from a peer ratio set: the single code path for the board and the leave-one-out check. */
+function estimate(p: P, catR: number[], allR: number[], asOf: string) {
+  const gMed = allR.length ? quant(allR, 0.5) : 0.25; // no live peers at all: fixed prior, flagged by peers = 0
+  const r = catR, n = r.length;
+  const catMed = n ? quant(r, 0.5) : gMed;
+  const w = n / (n + SHRINK);
+  const med = Math.min(3, Math.max(0.03, catMed * w + gMed * (1 - w)));
+  const spreadLo = n >= 3 ? quant(r, 0.25) / catMed : 0.35;
+  const spreadHi = n >= 3 ? quant(r, 0.75) / catMed : 2.5;
+  const age = p.listed_at && Number.isFinite(Date.parse(p.listed_at)) ? Math.max(0, Math.floor((Date.parse(`${asOf}T00:00:00Z`) - Date.parse(`${p.listed_at}T00:00:00Z`)) / DAY)) : null;
+  const growth = Math.min(120, Math.max(-60, p.change_7d ?? 0));
+  const gm = 1 + (growth / 100) * GROWTH_WEIGHT;
+  const mm = 0.6 + (Math.min(age ?? 365, 1095) / 1095) * 0.4;
+  const implied = Math.max(1, Math.round(p.tvl_usd * med * gm * mm));
+  // Deliberately wide band: peer interquartile spread, then widened for thin peer sets and unknown age.
+  const widen = 1 + (n < MIN_PEERS ? 0.5 : 0) + (age === null ? 0.25 : age < 180 ? 0.25 : 0);
+  const low = Math.max(1, Math.round((implied * Math.min(1, spreadLo)) / (1.6 * widen)));
+  const high = Math.round(implied * Math.max(1, spreadHi) * 1.6 * widen);
+  const conf = n >= 15 && age !== null && age >= 365 ? 'moderate' : n >= MIN_PEERS ? 'low' : 'very low';
+  return { n, catMed, med, gm, mm, growth, age, implied, low, high, conf };
+}
+
+/** Leave-one-out: re-estimate every live peer with itself removed from both its category set and the global set. */
+function leaveOneOut(live: P[], asOf: string) {
+  const errs: number[] = [];
+  let covered = 0;
+  const cats = new Map<string, { e: number[]; c: number }>();
+  const cat = (p: P) => p.category ?? '';
+  for (const h of live) {
+    const rest = live.filter((p) => p !== h);
+    if (rest.length === 0) continue;
+    const e = estimate(h, rest.filter((p) => cat(p) === cat(h)).map((p) => p.mcap_usd! / p.tvl_usd), rest.map((p) => p.mcap_usd! / p.tvl_usd), asOf);
+    if (rest.length === 0 || !(e.implied > 0)) continue;
+    errs.push(Math.max(e.implied / h.mcap_usd!, h.mcap_usd! / e.implied));
+    const hit = h.mcap_usd! >= e.low && h.mcap_usd! <= e.high;
+    if (hit) covered++;
+    const g = cats.get(cat(h)) ?? { e: [], c: 0 };
+    g.e.push(errs[errs.length - 1]!);
+    if (hit) g.c++;
+    cats.set(cat(h), g);
+  }
+  const n = errs.length;
+  // Per-category back-test, only where at least MIN_PEERS held-out protocols exist (fewer is noise).
+  const by_cat: Record<string, { n: number; median_factor: number; coverage: number }> = {};
+  for (const [k, g] of cats) if (g.e.length >= MIN_PEERS) by_cat[clean(k || 'Uncategorised', 50)] = { n: g.e.length, median_factor: round(quant(g.e, 0.5), 3), coverage: round(g.c / g.e.length, 4) };
+  return { by_cat, n, median_factor: n ? round(quant(errs, 0.5), 3) : null, coverage: n ? round(covered / n, 4) : null, covered, within_2x: n ? round(errs.filter((x) => x <= 2).length / n, 4) : null };
+}
+
 function build(s: ReturnType<typeof load>) {
   const live = s.ps.filter((p) => isLive(p) && (p.mcap_usd ?? 0) > 0 && p.tvl_usd > 0);
   const ratios = (ps: P[]) => ps.map((p) => p.mcap_usd! / p.tvl_usd);
   const all = ratios(live);
-  const gMed = quant(all, 0.5);
+  const gMed = all.length ? quant(all, 0.5) : 0.25;
   const byCat = new Map<string, P[]>();
   for (const p of live) byCat.set(p.category ?? '', [...(byCat.get(p.category ?? '') ?? []), p]);
 
@@ -82,28 +130,11 @@ function build(s: ReturnType<typeof load>) {
   for (const p of chosen.values()) preByCat.set(p.category ?? '', (preByCat.get(p.category ?? '') ?? 0) + 1);
 
   const scored = [...chosen.values()].map((p) => {
-    const peers = byCat.get(p.category ?? '') ?? [];
-    const r = ratios(peers);
-    const n = r.length;
-    const catMed = n ? quant(r, 0.5) : gMed;
-    const w = n / (n + SHRINK);
-    const med = Math.min(3, Math.max(0.03, catMed * w + gMed * (1 - w)));
-    const spreadLo = n >= 3 ? quant(r, 0.25) / catMed : 0.35;
-    const spreadHi = n >= 3 ? quant(r, 0.75) / catMed : 2.5;
-    const age = p.listed_at && Number.isFinite(Date.parse(p.listed_at)) ? Math.max(0, Math.floor((Date.parse(`${s.as_of}T00:00:00Z`) - Date.parse(`${p.listed_at}T00:00:00Z`)) / DAY)) : null;
-    const growth = Math.min(120, Math.max(-60, p.change_7d ?? 0));
-    const gm = 1 + (growth / 100) * GROWTH_WEIGHT;
-    const mm = 0.6 + (Math.min(age ?? 365, 1095) / 1095) * 0.4;
-    const implied = Math.max(1, Math.round(p.tvl_usd * med * gm * mm));
-    // Deliberately wide band: peer interquartile spread, then widened for thin peer sets and unknown age.
-    const widen = 1 + (n < MIN_PEERS ? 0.5 : 0) + (age === null ? 0.25 : age < 180 ? 0.25 : 0);
-    const low = Math.max(1, Math.round((implied * Math.min(1, spreadLo)) / (1.6 * widen)));
-    const high = Math.round(implied * Math.max(1, spreadHi) * 1.6 * widen);
-    const conf = n >= 15 && age !== null && age >= 365 ? 'moderate' : n >= MIN_PEERS ? 'low' : 'very low';
-    return { p, n, catMed, med, gm, mm, growth, age, implied, low, high, conf, pre: preByCat.get(p.category ?? '') ?? 0 };
+    const e = estimate(p, ratios(byCat.get(p.category ?? '') ?? []), all, s.as_of);
+    return { p, ...e, pre: preByCat.get(p.category ?? '') ?? 0 };
   });
   scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : 1));
-  return { scored, live, gMed, gN: all.length };
+  return { scored, live, gMed, gN: all.length, loo: leaveOneOut(live, s.as_of) };
 }
 
 // ---- protocol-specific due diligence -----------------------------------------------------------
@@ -148,7 +179,7 @@ const steps = (p: P, age: number | null): string[] => {
 
 // ---- run ---------------------------------------------------------------------------------------
 const snap = load();
-const { scored, live, gMed, gN } = build(snap);
+const { scored, live, gMed, gN, loo } = build(snap);
 const board = scored.map((s, i) => ({
   rank: i + 1, slug: s.p.slug, name: s.p.name, category: s.p.category, chains: s.p.chains, tvl_usd: s.p.tvl_usd,
   change_7d: s.p.change_7d, mcap_usd: s.p.mcap_usd, listed_at: s.p.listed_at, gecko_id: s.p.gecko_id, symbol: s.p.symbol,
@@ -166,14 +197,14 @@ for (const r of board) for (const t of r.farm_steps) if (t.length < 20 || t.leng
 const wl = new Set(snap.watch);
 const radar = {
   as_of: snap.as_of, source: snap.source, floor_usd: snap.floor, model_version: 'trolloks-peer-1',
-  model: { global_median_ratio: round(gMed), live_peers: gN, min_peers: MIN_PEERS, shrink: SHRINK, growth_weight: GROWTH_WEIGHT },
+  model: { global_median_ratio: round(gMed), live_peers: gN, min_peers: MIN_PEERS, shrink: SHRINK, loo, growth_weight: GROWTH_WEIGHT },
   watchlist_size: snap.watch.length, board_size: board.length, early_size: board.filter((r) => !wl.has(r.slug)).length,
   live_size: live.length,
   rows: scored.map((s, i) => ({
     rank: i + 1, slug: clean(s.p.slug, 100), name: clean(s.p.name), category: s.p.category === null ? null : clean(s.p.category, 50),
     chains: s.p.chains.slice(0, 12).map((c) => clean(c, 30)), tvl: s.p.tvl_usd, ch7: s.p.change_7d, listed: s.p.listed_at === null ? null : clean(s.p.listed_at, 10),
     age: s.age, implied: s.implied, low: s.low, high: s.high, ratio: round(s.med), cat_ratio: Number.isNaN(s.catMed) ? null : round(s.catMed),
-    peers: s.n, pre_peers: s.pre, conf: s.conf, gm: round(s.gm), mm: round(s.mm), watch: wl.has(s.p.slug), dd: dd(s.p, s.age, s.n).map((t) => clean(t, 240)),
+    peers: s.n, pre_peers: s.pre, conf: s.conf, gm: round(s.gm), mm: round(s.mm), watch: wl.has(s.p.slug), loo_cat: loo.by_cat[clean(s.p.category || 'Uncategorised', 50)] ?? null, dd: dd(s.p, s.age, s.n).map((t) => clean(t, 240)),
     steps: steps(s.p, s.age).map((t) => clean(t, 600)),
   })),
   live: live.sort((a, b) => b.mcap_usd! - a.mcap_usd!).slice(0, 40).map((p) => ({
@@ -195,4 +226,4 @@ copyFiles(join(here, 'dashboard'), join(out, 'dashboard'));
 const shots = copyFiles(join(here, 'screenshots'), join(out, 'screenshots'));
 if (shots.length < 3) { process.stderr.write('need 3 screenshots\n'); process.exit(1); }
 writeFileSync(join(out, 'dossier.json'), buildDossier(out, { text_max_bytes: 65_536, screenshots: { max: 4, max_bytes: 524_288 }, dashboard: { max_files: 400, max_bytes: 4_194_304 } }));
-process.stdout.write(`trolloks: ${board.length} rows (${radar.early_size} early), ${live.length} live peers, global mcap/TVL median ${round(gMed)}\n`);
+process.stdout.write(`trolloks: ${board.length} rows (${radar.early_size} early), ${live.length} live peers, global mcap/TVL median ${round(gMed)}; LOO n=${loo.n} median error ${loo.median_factor ?? "n/a"}x coverage ${loo.coverage ?? "n/a"}\n`);

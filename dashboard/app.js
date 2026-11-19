@@ -20,19 +20,43 @@
   }
   function pct(n) { return n == null ? '–' : (n > 0 ? '+' : '') + n.toFixed(1) + '%'; }
   var st = { view: 'board', q: '', cat: '', scope: 'all', row: '' };
-  var bySlug = {};
+  var bySlug = Object.create(null); // null prototype: hash values like "constructor" or "__proto__" are never found
 
   if (!D || !D.rows) { $('main').textContent = 'Data failed to load (data.js).'; return; }
   D.rows.forEach(function (r) { bySlug[r.slug] = r; });
 
   $('meta').textContent = 'Snapshot ' + D.as_of + ' · ' + D.source + ' · model ' + D.model_version;
+  var L = D.model.loo;
   var stats = [
     [D.board_size, 'ranked rows'], [D.watchlist_size, 'watchlist (all covered)'], [D.early_size, 'early candidates below ' + usd(D.floor_usd)],
     [D.model.live_peers, 'live-token peers used'], [D.model.global_median_ratio.toFixed(2) + '×', 'median mcap / TVL, all peers']
   ];
   stats.forEach(function (s) { var d = el('div', null, 'stat'); d.appendChild(el('b', String(s[0]))); d.appendChild(el('span', s[1])); $('stats').appendChild(d); });
 
-  var cats = {};
+  // Model check: the leave-one-out diagnostic, written for someone choosing where to look first.
+  (function () {
+    var box = $('check');
+    box.appendChild(el('h2', 'Model check: how wrong has this method been on tokens we can see?', null, { id: 'chkh' }));
+    if (!L.n) { box.appendChild(el('p', 'Not available: this snapshot has fewer than two live-token protocols with a market cap, so the method cannot be tested against known values.')); return; }
+    var big = el('div', null, 'big');
+    function card(v, t) { var d = el('div'); d.appendChild(el('b', v)); d.appendChild(el('span', t)); big.appendChild(d); }
+    var f = L.median_factor;
+    card(f.toFixed(1) + '× (a factor, not a percent)', 'Median error factor over ' + L.n + ' live-token protocols (unit: times too high or too low)');
+    card((L.coverage * 100).toFixed(0) + '% (' + L.covered + ' of ' + L.n + ')', 'Held-out market caps that fell inside the low–high range shown for them');
+    card((L.within_2x * 100).toFixed(0) + '%', 'Held-out protocols whose estimate was within 2× of the real market cap');
+    box.appendChild(big);
+    var ul = el('ul');
+    [
+      'How it was run: each live-token protocol was re-valued by this same model with itself removed from its category peers and from the all-market median, then compared with its actual market cap. The unit of every figure is USD market cap; errors are ratios.',
+      'Error factor ' + f.toFixed(1) + '×: error = the larger of estimate ÷ actual and actual ÷ estimate, so 1× is exact and 2× means off by double or by half. At the median, half of the protocols were off by more than ' + f.toFixed(1) + '×, in either direction. For a typical estimate of $100M about half of the back-tested protocols had an actual value between ' + usd(100e6 / f) + ' and ' + usd(100e6 * f) + ' (the other half were further out), so the range is very wide.',
+      'Coverage ' + (L.coverage * 100).toFixed(0) + '%: the shown ranges held the real value only about this often, so treat them as rough bands, not 90% intervals.',
+      'Why this is not a forecast: it measures how the method fit protocols that already have tokens, using the same snapshot the model was built on. Pre-token protocols differ (many never launch a token), the market changes, and the model was not tuned on separate data. Past coverage does not mean a future estimate has that chance of being right.',
+      'How to use it: rank order is for triage, not pricing. Prefer rows whose confidence is not “very low”, with several live peers, and whose category back-test (shown in the detail dialog) is better than the overall one. Then verify issuer, audits, token plans and TVL quality in the detail dialog before spending time.'
+    ].forEach(function (t) { ul.appendChild(el('li', t)); });
+    box.appendChild(ul);
+  })();
+
+  var cats = Object.create(null);
   D.rows.forEach(function (r) { var c = r.category || 'Uncategorised'; cats[c] = (cats[c] || 0) + 1; });
   var cs = $('cat');
   cs.appendChild(el('option', 'All categories (' + D.rows.length + ')', null, { value: '' }));
@@ -44,6 +68,7 @@
     'Estimate = TVL × ratio × growth × maturity. Growth = 1 + 0.3 × clamp(7d change, −60%, +120%). Maturity = 0.6 + 0.4 × min(age, 1095 days)/1095; unknown age counts as 365 days.',
     'Range: the peers\' 25th–75th percentile ratio, then widened by 1.6× each way, and more when peers are under ' + D.model.min_peers + ', or age is unknown or under 180 days. Treat the range, not the point, as the answer.',
     'Excluded from early candidates: anything with a recorded token (live), exchanges, versioned pools (e.g. "V3", "2.0") and wrapper/receipt products such as exchange-issued staked assets. The whole watchlist is always ranked.',
+    'Back-test: see the “Model check” panel above the table.',
     'Live-token rows are shown only as the market\'s own values and are never ranked with pre-token protocols.'
   ].forEach(function (t) { mb.appendChild(el('p', t)); });
 
@@ -101,7 +126,7 @@
       rows.forEach(function (r) {
         var tr = el('tr');
         tr.appendChild(el('td', String(r.rank), 'n'));
-        var td = el('td'); var b = el('button', r.name, 'link', { type: 'button', 'aria-haspopup': 'dialog' });
+        var td = el('td'); var b = el('button', r.name, 'link', { type: 'button', 'aria-haspopup': 'dialog', 'data-slug': r.slug });
         b.addEventListener('click', function () { st.row = r.slug; writeHash(); openRow(); });
         td.appendChild(b); if (r.watch) { td.appendChild(document.createTextNode(' ')); td.appendChild(el('span', 'watch', 'tag w')); }
         tr.appendChild(td);
@@ -138,7 +163,14 @@
     var m = el('u'); m.style.left = Math.max(0, Math.min(97, x * 100)).toFixed(1) + '%'; w.appendChild(m);
     return w;
   }
-  var lastFocus = null;
+  var lastFocus = null, lastSlug = '';
+  // Re-find the opener after the table was re-rendered; fall back to the search box so focus is never lost.
+  function restoreFocus() {
+    var t = null;
+    if (lastSlug) Array.prototype.forEach.call($('tbl').querySelectorAll('button.link'), function (x) { if (x.getAttribute('data-slug') === lastSlug) t = x; });
+    if (!t && lastFocus && lastFocus.isConnected) t = lastFocus;
+    (t || $('q')).focus();
+  }
   function kv(parent, k, v) { var d = el('div'); d.appendChild(el('b', v)); d.appendChild(el('span', k)); parent.appendChild(d); }
   function list(parent, title, items, ordered) {
     parent.appendChild(el('h3', title)); var l = el(ordered ? 'ol' : 'ul');
@@ -157,14 +189,16 @@
     kv(g, 'Category median (live)', r.cat_ratio == null ? 'no peers' : r.cat_ratio.toFixed(2) + '×'); kv(g, 'All-market median', D.model.global_median_ratio.toFixed(2) + '×');
     kv(g, 'Peer group', r.peers + ' live-token, ' + r.pre_peers + ' pre-token on board'); kv(g, 'Confidence', r.conf);
     b.appendChild(g);
+    var lc = r.loo_cat;
+    if (L.n) b.appendChild(el('p', 'Back-test for this category (leave-one-out, live-token ' + (r.category || 'uncategorised') + ' protocols): ' + (lc ? 'median error ' + lc.median_factor.toFixed(1) + '×, ' + (lc.coverage * 100).toFixed(0) + '% of ranges held the real market cap, n = ' + lc.n + '. ' + (lc.median_factor > L.median_factor ? 'Worse than the overall ' + L.median_factor.toFixed(1) + '×: be more sceptical of this estimate.' : 'Not worse than the overall ' + L.median_factor.toFixed(1) + '×.') : 'fewer than ' + D.model.min_peers + ' held-out peers, no category-level result; only the overall ' + L.median_factor.toFixed(1) + '× applies.') + ' A typical-error band is ' + usd(r.implied / L.median_factor) + ' – ' + usd(r.implied * L.median_factor) + ' (estimate ÷ and × the overall median error). This describes past fit on live tokens, not the chance this protocol launches a token or reaches that value.', 'muted'));
     b.appendChild(el('p', 'Arithmetic: ' + usd(r.tvl) + ' × ' + r.ratio.toFixed(3) + ' × growth ' + r.gm.toFixed(3) + ' × maturity ' + r.mm.toFixed(3) + ' = ' + usd(r.implied) + '. The range is intentionally wide; the true figure could sit outside it.', 'muted'));
     list(b, 'Due diligence for this protocol', r.dd);
     list(b, 'Low-cost farm plan', r.steps, true);
-    lastFocus = document.activeElement;
+    if (!dlg.open) { lastFocus = document.activeElement; lastSlug = r.slug; }
     if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); }
     c.focus();
   }
-  $('dlg').addEventListener('close', function () { st.row = ''; writeHash(); if (lastFocus && lastFocus.focus) lastFocus.focus(); });
+  $('dlg').addEventListener('close', function () { st.row = ''; writeHash(); restoreFocus(); });
   $('dlg').addEventListener('click', function (e) { if (e.target === this) this.close(); });
   $('q').addEventListener('input', function () { st.q = this.value.trim().slice(0, 80); writeHash(); render(); });
   $('cat').addEventListener('change', function () { st.cat = this.value; writeHash(); render(); });
