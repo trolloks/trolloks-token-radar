@@ -187,6 +187,17 @@ const board = scored.map((s, i) => ({
   model: { base_multiple: round(s.med), growth_pct: s.growth, growth_multiplier: round(s.gm), maturity_multiplier: round(s.mm), age_days: s.age },
   farm_steps: steps(s.p, s.age),
 }));
+// runtime invariants: refuse to write a board that is duplicated, non-finite/negative, or out of order
+{
+  const seenSlugs = new Set<string>();
+  board.forEach((r, i) => {
+    if (seenSlugs.has(r.slug)) throw new Error(`invariant: duplicate slug ${r.slug}`);
+    seenSlugs.add(r.slug);
+    if (!Number.isFinite(r.implied_value_usd) || r.implied_value_usd < 0) throw new Error(`invariant: ${r.slug} has implied value ${r.implied_value_usd}`);
+    if (r.rank !== i + 1) throw new Error(`invariant: ${r.slug} has rank ${r.rank} at position ${i + 1}`);
+    if (i > 0 && r.implied_value_usd > board[i - 1]!.implied_value_usd) throw new Error(`invariant: rank ${r.rank} (${r.slug}) outranks rank ${i} on implied value`);
+  });
+}
 // gate checks
 const wset = new Set(board.map((r) => r.slug));
 const missing = snap.watch.filter((w) => snap.ps.some((p) => p.slug === w) && !wset.has(w));
