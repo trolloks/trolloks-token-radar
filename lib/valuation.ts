@@ -76,6 +76,7 @@ export interface Row {
   ch7: number | null;
   listed: string | null;
   age: number | null;
+  categoryAdj: number;
   implied: number;
   low: number;
   high: number;
@@ -229,10 +230,13 @@ type ValueTerm = 'size' | 'category' | 'growth' | 'age' | 'chains';
 
 interface ValueFit {
   predict: (p: Protocol) => number;
+  categoryAdj: (p: Protocol) => number;
   coef: number[];
 }
 
-const valueVector = (p: Protocol, terms: ValueTerm[], categories: string[]): number[] => {
+const CATEGORY_SHRINK = 20;
+
+const valueVector = (p: Protocol, terms: ValueTerm[]): number[] => {
   const x: number[] = [1];
   for (const t of terms) {
     if (t === 'size') x.push(Math.log(p.tvl));
@@ -240,19 +244,19 @@ const valueVector = (p: Protocol, terms: ValueTerm[], categories: string[]): num
     else if (t === 'age') x.push(Math.log(1 + (ageDays(p, AS_OF) ?? 365) / 365));
     else if (t === 'chains') x.push(Math.min(p.chains.length, 10));
   }
-  if (terms.includes('category')) for (const c of categories.slice(1)) x.push((p.category ?? '') === c ? 1 : 0);
   return x;
 };
 
 let AS_OF = '1970-01-01';
 
+/** Size curve plus a heavily shrunk category residual (n / (n + 20) of the category median). */
 const fitValue = (rows: Protocol[], terms: ValueTerm[]): ValueFit => {
-  const categories = terms.includes('category') ? [...new Set(rows.map((p) => p.category ?? ''))].sort() : [];
-  const cols = valueVector(rows[0]!, terms, categories).length;
+  const linear = terms.filter((t) => t !== 'category');
+  const cols = valueVector(rows[0]!, linear).length;
   const A = Array.from({ length: cols }, () => Array<number>(cols).fill(0));
   const b = Array<number>(cols).fill(0);
   for (const p of rows) {
-    const x = valueVector(p, terms, categories);
+    const x = valueVector(p, linear);
     const y = Math.log(p.mcap! / p.tvl);
     for (let i = 0; i < cols; i++) {
       b[i] += x[i]! * y;
@@ -261,13 +265,26 @@ const fitValue = (rows: Protocol[], terms: ValueTerm[]): ValueFit => {
   }
   for (let i = 0; i < cols; i++) A[i]![i] += RIDGE;
   const coef = solve(A, b);
-  return {
-    coef,
-    predict: (p) => {
-      const x = valueVector(p, terms, categories);
-      return p.tvl * Math.exp(x.reduce((s, v, i) => s + v * (coef[i] ?? 0), 0));
-    },
+  const base = (p: Protocol): number => {
+    const x = valueVector(p, linear);
+    return p.tvl * Math.exp(x.reduce((sum, v, i) => sum + v * (coef[i] ?? 0), 0));
   };
+  const byCategory = new Map<string, number[]>();
+  for (const p of rows) {
+    const c = p.category ?? '';
+    const list = byCategory.get(c) ?? [];
+    list.push(Math.log(p.mcap! / base(p)));
+    byCategory.set(c, list);
+  }
+  const categoryMedian = new Map<string, number>();
+  for (const [c, list] of byCategory) categoryMedian.set(c, median(list));
+  const categoryAdj = (p: Protocol): number => {
+    if (!terms.includes('category')) return 0;
+    const c = p.category ?? '';
+    const n = (byCategory.get(c) ?? []).length;
+    return (n / (n + CATEGORY_SHRINK)) * (categoryMedian.get(c) ?? 0);
+  };
+  return { coef, categoryAdj, predict: (p) => base(p) * Math.exp(categoryAdj(p)) };
 };
 
 const medianFactor = (pairs: [number, number][]): number => median(pairs.map(([est, actual]) => Math.max(est / actual, actual / est)));
@@ -479,12 +496,12 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
   const live = snapshot.protocols.filter((p) => !isPreToken(p) && p.mcap !== null && p.mcap > 0 && p.tvl > 0);
   const watch = new Set(snapshot.watchlist);
 
-  // value model: flat baseline, then each term added to size; keep only size
+  // value model: size curve plus a heavily shrunk category effect; the rest tested and dropped
   const baselineLoo = valueLoo(live, []);
   const baselineWf = valueWalkForward(live, []);
   const valueTerms: { term: ValueTerm; label: string; note: string }[] = [
     { term: 'size', label: 'size curve (log TVL)', note: 'kept: sharpest cut in both tests' },
-    { term: 'category', label: 'category effect', note: 'not kept: improves walk-forward but worsens leave-one-out' },
+    { term: 'category', label: 'category effect (shrunk)', note: 'kept: small improvement in both tests with a 20-protocol prior' },
     { term: 'growth', label: '7-day TVL growth', note: 'not kept: worse in both tests; enters through the odds model' },
     { term: 'age', label: 'log age', note: 'not kept: worse in both tests; enters through the odds model' },
     { term: 'chains', label: 'chain count', note: 'not kept: no improvement in either test' },
@@ -493,14 +510,14 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     const terms: ValueTerm[] = t.term === 'size' ? ['size'] : ['size', t.term];
     const loo = valueLoo(live, terms);
     const wf = valueWalkForward(live, terms);
-    const kept = t.term === 'size';
+    const kept = t.term === 'size' || t.term === 'category';
     return { term: t.label, loo: round(loo, 3), wf: round(wf, 3), kept, note: t.note };
   });
-  const value = fitValue(live, ['size']);
+  const value = fitValue(live, ['size', 'category']);
   const looResiduals: number[] = [];
   const looPairs: [number, number][] = [];
   for (let i = 0; i < live.length; i++) {
-    const model = fitValue(live.filter((_, j) => j !== i), ['size']);
+    const model = fitValue(live.filter((_, j) => j !== i), ['size', 'category']);
     const p = live[i]!;
     const est = model.predict(p);
     looPairs.push([est, p.mcap!]);
@@ -524,7 +541,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     intercept: round(intercept, 3),
     multipleAt100m: round(Math.exp(intercept + slope * Math.log(1e8)), 3),
     loo: round(medianFactor(looPairs), 3),
-    wf: round(valueWalkForward(live, ['size']), 3),
+    wf: round(valueWalkForward(live, ['size', 'category']), 3),
     baselineLoo: round(baselineLoo, 3),
     baselineWf: round(baselineWf, 3),
     bands,
@@ -609,6 +626,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
       ch7: s.p.ch7,
       listed: s.p.listed,
       age: s.age,
+      categoryAdj: round(value.categoryAdj(s.p), 6),
       implied: s.implied,
       low: s.low,
       high: s.high,

@@ -36,7 +36,7 @@
   function multi(n) { return (n >= 10 ? n.toFixed(1) : n >= 1 ? n.toFixed(2) : n.toFixed(3)) + '×'; }
   function year(n) { return n === null ? 'unknown' : n >= 365 ? (n / 365).toFixed(1) + ' yrs' : n + ' days'; }
   function chip(text, cls) { return el('span', 'chip' + (cls ? ' ' + cls : ''), text); }
-  function valueAt(tvl) { return tvl * Math.exp(R.model.value.intercept + R.model.value.slope * Math.log(tvl)); }
+  function valueAt(tvl, adj) { return tvl * Math.exp(R.model.value.intercept + R.model.value.slope * Math.log(tvl) + (adj || 0)); }
   function oddsAt(row, growth, ageDays) {
     var c = R.model.odds.coef;
     var z = c[0] + c[1] * row.oddsInput.size + c[2] * Math.log(1 + ageDays / 365) + c[3] * growth + c[4] * row.oddsInput.categoryRate;
@@ -378,7 +378,7 @@
       var tvl = sliderToTvl(Number(tvlSlide.value));
       var growth = Number(growthSlide.value) / 100;
       var age = Number(ageSlide.value);
-      var implied = Math.max(1, Math.round(valueAt(tvl)));
+      var implied = Math.max(1, Math.round(valueAt(tvl, r.categoryAdj)));
       var odds = oddsAt(r, growth, age);
       tvlOut.textContent = money(tvl);
       growthOut.textContent = pct(growth * 100);
@@ -464,7 +464,7 @@
       terms.appendChild(d);
     });
     left.appendChild(terms);
-    left.appendChild(el('p', null, 'The fitted curve is log(market cap / TVL) = ' + R.model.value.intercept.toFixed(3) + ' ' + (R.model.value.slope < 0 ? '−' : '+') + ' ' + Math.abs(R.model.value.slope).toFixed(3) + ' × ln(TVL). At $100M TVL that is a ' + multi(R.model.value.multipleAt100m) + ' multiple; at this protocol TVL it is ' + multi(multiple) + '. Held out, the curve misses by ' + R.model.value.loo.toFixed(2) + '× (leave-one-out) and ' + R.model.value.wf.toFixed(2) + '× (walk-forward).'));
+    left.appendChild(el('p', null, 'The fitted curve is log(market cap / TVL) = ' + R.model.value.intercept.toFixed(3) + ' ' + (R.model.value.slope < 0 ? '−' : '+') + ' ' + Math.abs(R.model.value.slope).toFixed(3) + ' × ln(TVL), plus a category adjustment (here ' + (r.categoryAdj * 100).toFixed(0) + '%). At $100M TVL the size curve gives ' + multi(R.model.value.multipleAt100m) + '; at this TVL the full model gives ' + multi(multiple) + '. Held out, it misses by ' + R.model.value.loo.toFixed(2) + '× (leave-one-out) and ' + R.model.value.wf.toFixed(2) + '× (walk-forward).'));
     var oddsBox = el('div', 'sandbox');
     var oddsHead = el('div', 'sbHead');
     oddsHead.appendChild(el('h4', null, 'Token odds'));
