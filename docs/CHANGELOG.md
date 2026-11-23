@@ -27,11 +27,14 @@ Rank is the leaderboard row; the rate is the Bradley-Terry win rate against the 
 
 ## Iterations
 
-### v2, 2026-11-23 (in progress)
+### v2, 2026-11-23 — submitted
 
+- Commit `dbdc011`, submission `01a207ed-4076-742e-9a2a-16f5bbc080e3`, receipt 10:21:58 UTC.
 - Log-space model: implied = TVL x shrunk category multiple x growth x maturity.
 - Five-fold held-out calibration; 80% bands set from held-out residuals by confidence.
 - 342 board rows, 198 launch candidates, 128 live peers separated.
 - Costed farm plans and a server-side invariant check before the board is written.
 - New dashboard: board, per-protocol detail page, live-peer tab, method tab.
+- Transcript gate locally: 78.4% of counted lines authored, 70 assistant turns, run record pass.
+- Score: pending.
 
