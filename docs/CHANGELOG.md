@@ -280,3 +280,17 @@ checksum. v11 adds both:
   `overall: true` at 85.2% authored (2,157/2,531 lines); scheduled 2026-11-24T00:10:30Z,
   after v10; the scheduler (PID 1306716) waits for the v10 pick, then reads the current
   final entry's score and pins the best of v5/v9c/v10/v11.
+
+## v12 candidate, 2026-11-23 — the last entry
+
+The codex's remaining criterion-2 note and the leader's farm/range presentation:
+- Each farm plan is sized at 0.02% of the protocol's TVL (capped at $250K); the detail
+  says "written for $X" and its sensitivity table includes the plan's capital.
+- The board subline shows the rank range derived from the P25-P75 values.
+- The detail explains that growth and age were tested for the value and dropped; they
+  price the token odds, not the launch value.
+- Farm counts: 18 worth / 180 marginal / 0 skip; source 64,557/65,536; dossier 64,826.
+- Gate all PASS; two builds byte-identical; screenshots rebuilt.
+- Commit `86aeb38`; bundle `6859ec7b...` (19,819,804 bytes); site check overall true,
+  85.2% authored (2,166/2,540); scheduled 2026-11-24T00:15:30Z; scheduler PID 1333888.
+  This is the last quota entry.
