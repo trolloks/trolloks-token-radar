@@ -170,3 +170,13 @@ snapshot carries no pool or route data.
 - Scheduled: `/tmp/opencode/submit-v8b.sh` wakes at 2026-11-24T00:00:30Z, checks
   `can_submit`, then submits commit `4615746` with the checked bundle. v5 stays the final
   pick until v8b is scored and compared.
+
+## Model test, 2026-11-23 — shrunk category effect
+
+A heavily shrunk category effect (20 pseudo-protocols on top of the size curve) improves
+both blind tests by a small margin: leave-one-out 3.40x vs 3.44x, walk-forward 3.27x vs
+3.39x, and gives a second kept term (matching the leader's "2 of 6"). Top values stay
+plausible (the CEX and bridge records still lead, so candidates are unaffected).
+
+Not adopted for v8b: the dashboard source is at the 65,536-byte cap and the gain is
+within noise. Keep as the v9 candidate if the final heat needs another entry.
