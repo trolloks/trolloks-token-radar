@@ -301,5 +301,11 @@ The codex's remaining criterion-2 note and the leader's farm/range presentation:
   a $10K plan across six protocols read "6 protocols · $2K each" ($12K). The summary and
   allocation column now use exact dollars ($1,667). Source 64,641/65,536; dossier 64,910.
 - Commit `f9ff40af`; bundle `232f0cd6...` (21,907,551 bytes); site check overall true,
-  85.4% authored (2,197/2,571); scheduled 2026-11-24T00:15:30Z; scheduler PID 1397559.
+  85.4% authored (2,197/2,571).
+- A worth-row audit then found the same $10K residue in the copy: the worth verdict,
+  board footnote and method page still assumed a $10,000 position while the plan is
+  0.02% of TVL. The verdict now names the plan's capital and the copy explains the
+  sizing. Source 64,784/65,536; dossier 65,053.
+- Commit `cd5a71e`; bundle `de79596f...` (22,350,963 bytes); site check overall true,
+  85.5% authored (2,207/2,581); scheduled 2026-11-24T00:15:30Z; scheduler PID 1406634.
   This is the last quota entry.
