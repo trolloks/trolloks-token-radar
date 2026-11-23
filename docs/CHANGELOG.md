@@ -270,5 +270,7 @@ checksum. v11 adds both:
 - The model label is radar-v11 in the header and the data.
 - Gate all PASS; two builds byte-identical; screenshots 266,607 / 254,950 / 257,475 /
   251,157; dossier 1,439,806.
-- Commit `60cb8c3` on `v11`; scheduled 2026-11-24T00:10:30Z, after v10; the scheduler
-  reads the current final entry's score and pins the best of v5/v9c/v10/v11.
+- Commit `60cb8c3` on `v11`; bundle `5c3b4882...` (19,368,642 bytes); site check `overall:
+  true` at 84.8% authored (2,094/2,468 lines); scheduled 2026-11-24T00:10:30Z, after v10;
+  the scheduler (PID 1276498) waits for the v10 pick, then reads the current final entry's
+  score and pins the best of v5/v9c/v10/v11.
