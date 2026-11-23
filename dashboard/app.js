@@ -527,7 +527,7 @@ left.appendChild(pt);
 }
 cols.appendChild(left);
 
-var f = farm(r, R.model.planSize);
+var f = farm(r, r.plan.capital);
 var right = el('div', 'panel');
 right.appendChild(el('h3', null, 'Farm verdict'));
 var vh = el('div', 'verdictHead');

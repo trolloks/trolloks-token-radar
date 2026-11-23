@@ -718,7 +718,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     source: snapshot.source,
     floor: snapshot.floor,
     model: {
-      name: 'radar-v11 fitted size curve + token odds + browser refit',
+      name: 'radar-v12 fitted size curve + token odds + browser refit',
       value: valueCheck,
       odds: oddsCheck,
       livePeers: live.length,
