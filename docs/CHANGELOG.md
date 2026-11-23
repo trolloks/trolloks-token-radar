@@ -117,3 +117,11 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - Submitted as the measured feature test: ledger + evidence strip + farm scenarios + planner.
 - Commit `5c4bb5a`, submission `01a2082f-f28f-737e-b47b-3664d79672c8`, receipt 11:34:41 UTC.
 - Transcript gate locally: 83.5% of counted lines authored, 221 assistant turns, run record pass.
+- Score: 939,310 (93.93%), interval 922,935-955,686, 20/20 wins. Slightly below v5's 942,846.
+- v5 stays the final pick. The ledger/evidence/scenario/planner features did not move the
+  judge; the margin stayed at 4.39 against v5's 4.43.
+- Model test after v7: a shrunk category effect reaches 3.80x leave-one-out / 3.00x
+  walk-forward (size-only: 3.44x/3.39x). The walk-forward improves, the leave-one-out
+  worsens; not a clear enough gain to replace the best entry. The value model is near its
+  ceiling on this snapshot.
+- Quota after v7: 6 entries made, 4 left in total, today's 5 spent.
