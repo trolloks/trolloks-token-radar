@@ -571,7 +571,7 @@ pbody.appendChild(tr);
 });
 plan.appendChild(pbody);
 right.appendChild(plan);
-right.appendChild(el('div', 'verdict', r.plan.verdict === 'worth' ? 'Worth farming at $10,000: the modelled drop beats the 4% T-bill after fees. Cap the position at what you can leave for 12 weeks.' : r.plan.verdict === 'marginal' ? 'Marginal: the modelled drop clears fees but not the T-bill. Farm only if you already hold the asset or value the activity record.' : 'Skip: fees exceed the modelled drop at this size. Wait for a larger implied value or lower fees.'));
+right.appendChild(el('div', 'verdict', r.plan.verdict === 'worth' ? 'Worth farming at $10,000: the modelled drop beats the 4% T-bill after fees and the token odds are at least 75%. Cap the position at what you can leave for 12 weeks.' : r.plan.verdict === 'marginal' ? (r.plan.net > r.plan.benchmark ? 'Marginal: the modelled drop clears the T-bill, but the token odds are below 75%. Farm only if you already hold the asset or value the activity record.' : 'Marginal: the modelled drop clears fees but not the T-bill. Farm only if you already hold the asset or value the activity record.') : 'Skip: fees exceed the modelled drop at this size. Wait for a larger implied value or lower fees.'));
 right.appendChild(el('h3', null, 'Before you spend gas'));
 var ul = el('ul', 'dd');
 r.dd.forEach(function (t) { ul.appendChild(el('li', null, t)); });
@@ -684,14 +684,16 @@ var risk = $('#planRisk').value;
 var owned = R.rows.filter(function (r) { return pins.has(r.slug); });
 var pool = owned.length ? owned : R.rows.filter(function (r) { return r.candidate && r.plan.verdict !== 'skip'; }).sort(function (a, b) { return b.plan.perHour - a.plan.perHour; }).slice(0, 6);
 if (risk === 'worth') {
-var probe = budget / Math.max(1, pool.length);
-for (var pass = 0; pass < 5; pass++) {
-var kept = pool.filter(function (r) { return farm(r, probe, horizon).verdict === 'worth'; });
-if (kept.length === 0) { pool = []; break; }
+var all = owned.length ? owned : R.rows.filter(function (r) { return r.candidate && r.plan.verdict !== 'skip'; });
+var probe = budget / Math.max(1, all.length);
+var kept = all.filter(function (r) { return farm(r, probe, horizon).verdict === 'worth'; });
+for (var pass = 0; pass < 5 && kept.length; pass++) {
 var next = budget / kept.length;
-if (kept.length === pool.length && Math.abs(next - probe) < 1) { pool = kept; probe = next; break; }
-pool = kept; probe = next;
+var nextKept = kept.filter(function (r) { return farm(r, next, horizon).verdict === 'worth'; });
+if (nextKept.length === kept.length) { kept = nextKept; probe = next; break; }
+kept = nextKept; probe = next;
 }
+pool = kept;
 }
 var host = $('#planBody');
 host.replaceChildren();
