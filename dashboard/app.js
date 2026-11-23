@@ -129,15 +129,41 @@
 
     var line = $('#statusLine');
     line.replaceChildren();
-    [[FMT.format(c.protocols), 'protocols'], [FMT.format(c.preToken) + '/' + FMT.format(c.preToken), 'with no token, all ranked'], [FMT.format(c.candidates), 'launch candidates'], [FMT.format(c.live), 'live peers, separated'], [FMT.format(c.unpriced), 'unpriced token records']].forEach(function (f, i) {
-      if (i) line.appendChild(el('span', 'flowArrow', '→'));
-      var item = el('span', 'flowItem' + (i === 2 ? ' hot' : i === 3 ? ' ok' : ''));
-      item.appendChild(el('b', null, f[0]));
-      item.appendChild(document.createTextNode(' ' + f[1]));
-      line.appendChild(item);
+    var bar = el('div', 'ledgerBar');
+    [
+      [c.watchlist, 'w', 'watchlist'],
+      [c.preToken - c.watchlist, 'e', 'below the floor'],
+      [c.live, 'l', 'live peers'],
+      [c.unpriced, 'u', 'unpriced records']
+    ].forEach(function (seg) {
+      var i = el('i', seg[1]);
+      i.style.width = (seg[0] / c.protocols) * 100 + '%';
+      i.title = FMT.format(seg[0]) + ' ' + seg[2];
+      bar.appendChild(i);
     });
-    line.appendChild(el('span', 'flowNote', '342 + 128 + 288 = 758 · watchlist ' + c.watchlistCovered + '/' + c.watchlist + ' · 144 of the 342 are bridge, CEX or wrapped/versioned products, shown under All records'));
-    $('#contract').textContent = 'Value ' + v.loo.toFixed(2) + '× LOO, ' + v.wf.toFixed(2) + '× walk-forward vs ' + v.baselineLoo.toFixed(2) + '×/' + v.baselineWf.toFixed(2) + '× flat · odds Brier ' + o.brier.toFixed(3) + ' vs ' + o.brierBase.toFixed(3) + ' base · ' + c.candidates + ' candidates ranked through ' + c.worth + ' worth-farming verdicts · farm economics against a 4% T-bill';
+    line.appendChild(bar);
+    var legend = el('span', 'ledgerLegend');
+    legend.appendChild(el('b', null, '758/758 accounted'));
+    legend.appendChild(document.createTextNode(' · ' + c.watchlist + ' watchlist + ' + (c.preToken - c.watchlist) + ' below the floor + ' + c.live + ' live + ' + c.unpriced + ' unpriced · ' + (c.watchlist + c.preToken - c.watchlist + c.live + c.unpriced) + ' total · 144 of the 342 pre-token records are bridge/CEX/wrapped products, shown under All records'));
+    line.appendChild(legend);
+    var contract = $('#contract');
+    contract.replaceChildren();
+    var vline = el('div', 'evLine');
+    vline.appendChild(el('b', null, 'Value LOO/WF '));
+    v.terms.forEach(function (t, i) {
+      if (i) vline.appendChild(document.createTextNode(' · '));
+      vline.appendChild(document.createTextNode(t.term + ' ' + t.loo.toFixed(2) + '/' + t.wf.toFixed(2) + ' '));
+      vline.appendChild(el('i', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'dropped'));
+    });
+    contract.appendChild(vline);
+    var oline = el('div', 'evLine');
+    oline.appendChild(el('b', null, 'Odds Brier '));
+    o.terms.forEach(function (t, i) {
+      if (i) oline.appendChild(document.createTextNode(' · '));
+      oline.appendChild(document.createTextNode(t.term + ' ' + t.loo.toFixed(3) + '/' + t.wf.toFixed(3) + ' '));
+      oline.appendChild(el('i', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'base'));
+    });
+    contract.appendChild(oline);
   }
 
   // ---------- board ----------
@@ -484,15 +510,27 @@
     vh.appendChild(el('span', 'verdict v-' + r.plan.verdict, r.plan.verdict.toUpperCase()));
     vh.appendChild(el('b', null, '$' + f.net.toFixed(0) + ' net · $' + f.perHour.toFixed(0) + ' per hour'));
     right.appendChild(vh);
-    var econ = el('div', 'terms');
-    [['Drop', money(f.drop), '7% of implied × position/TVL'], ['Fees', '$' + f.fees.toFixed(2), 'gas for 8 steps'], ['T-bill', money(f.benchmark), 'same $10k, 12 weeks'], ['Per hour', '$' + f.perHour.toFixed(0), 'net / active hour']].forEach(function (t) {
-      var d = el('div', 'term');
-      d.appendChild(el('span', null, t[0]));
-      d.appendChild(el('b', null, t[1]));
-      d.appendChild(el('em', null, t[2]));
-      econ.appendChild(d);
+    var share = el('table', 'mini shareTable');
+    var sh = el('thead');
+    var shr = el('tr');
+    ['Position', 'Drop', 'Fees', 'Net', 'T-bill', 'Verdict'].forEach(function (h, i) { shr.appendChild(el('th', i ? 'num' : '', h)); });
+    sh.appendChild(shr);
+    share.appendChild(sh);
+    var sb = el('tbody');
+    [1000, 10000, 50000].forEach(function (pos) {
+      var s = farm(r, pos);
+      var tr = el('tr', pos === R.model.planSize ? 'current' : '');
+      tr.appendChild(el('td', null, '$' + pos.toLocaleString('en-US')));
+      tr.appendChild(el('td', 'num', money(s.drop)));
+      tr.appendChild(el('td', 'num', '$' + s.fees.toFixed(2)));
+      tr.appendChild(el('td', 'num ' + (s.net > 0 ? 'up' : 'dn'), '$' + s.net.toFixed(0)));
+      tr.appendChild(el('td', 'num', money(s.benchmark)));
+      tr.appendChild(el('td', null, s.verdict));
+      sb.appendChild(tr);
     });
-    right.appendChild(econ);
+    share.appendChild(sb);
+    right.appendChild(share);
+    right.appendChild(el('p', 'muted', 'Drop = implied × 7% × position/TVL; T-bill is the same money at 4% for 12 weeks. The plan below is written for $10,000.'));
     var plan = el('table', 'mini planTable');
     var thead = el('thead');
     var hr = el('tr');

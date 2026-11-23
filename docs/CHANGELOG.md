@@ -90,3 +90,16 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - Screenshots at 1280x1024 to carry more evidence per image.
 - Commit `aa3714f`, submission `01a2081c-7069-7016-b6be-587e77d750a2`, receipt 11:13:31 UTC.
 - Transcript gate locally: 83.0% of counted lines authored, 185 assistant turns, run record pass.
+
+### v6, 2026-11-23 — built, not submitted
+
+- Add the 758-protocol ledger bar (watchlist / below floor / live / unpriced).
+- Put the value and odds term tests on the board as a compact evidence strip, so the
+  primary screenshot carries the kept/dropped table the judge reads on the method page.
+- Add a position-size scenario table to the detail farm verdict ($1k / $10k / $50k with
+  drop, fees, net, T-bill benchmark and verdict).
+- Model unchanged from v5 (the category-free and category-heavy variants both failed a
+  blind test; v5's size-curve value and size/age/growth/category odds remain the best).
+- Dossier text is 64,683 of the 65,536-byte cap, so this is the last content change
+  without cutting something.
+- Held under the user's rule: only a massive improvement earns another submission.

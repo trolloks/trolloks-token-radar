@@ -34,7 +34,15 @@ main{max-width:1440px;margin:0 auto;padding:20px 32px 40px}
 .kpi.hot b{color:var(--amber)}
 .kpi.chartCard{display:flex;flex-direction:column;justify-content:space-between;padding:10px 10px 8px}
 .kpi.chartCard svg{width:100%;height:52px;display:block}
-.statusline{margin:12px 0 4px;color:var(--mute);font-size:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.statusline{margin:12px 0 4px;color:var(--mute);font-size:12px}
+.ledgerBar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:#1b2639;margin:0 0 5px}
+.ledgerBar i{display:block;height:100%}
+.ledgerBar i.w{background:var(--amber)}
+.ledgerBar i.e{background:#8a6a2a}
+.ledgerBar i.l{background:var(--teal)}
+.ledgerBar i.u{background:#3a4a68}
+.ledgerLegend{display:block;color:var(--dim);font-size:11px}
+.ledgerLegend b{color:var(--text);font-family:var(--mono)}
 .chip{display:inline-block;border:1px solid var(--line2);border-radius:999px;padding:2px 9px;font:600 10px/1.5 var(--mono);letter-spacing:.04em;color:var(--mute)}
 .chip.watch{color:var(--amber2);border-color:#6a5420;background:#231a08}
 .chip.ok{color:var(--teal);border-color:#1d5c50;background:#08201c}
@@ -44,7 +52,14 @@ main{max-width:1440px;margin:0 auto;padding:20px 32px 40px}
 .flowItem.hot b{color:var(--amber)}
 .flowItem.ok b{color:var(--teal)}
 .flowNote{color:var(--dim);font-size:11px;margin-left:8px}
-.contract{margin:0 0 14px;color:var(--dim);font-size:11px;line-height:1.5}
+.contract{margin:0 0 14px;color:var(--dim);font-size:11px;line-height:1.55}
+.evLine b{color:var(--mute);font-weight:600}
+.evLine i{font-style:normal;font-family:var(--mono);font-size:10px;margin-left:2px}
+.evLine i.up{color:var(--teal)}
+.evLine i.flat{color:#8a7a9a}
+.shareTable{margin:8px 0 4px}
+.shareTable tr.current td{color:var(--text);font-weight:600}
+.shareTable td:last-child{text-transform:uppercase;font-size:10px;letter-spacing:.04em}
 .toolbar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:12px 0 8px}
 .toolbar label{display:flex;flex-direction:column;gap:4px}
 .toolbar label>span{font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
