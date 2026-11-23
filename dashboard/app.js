@@ -134,7 +134,7 @@ var kpis = [
 ['Out-of-sample miss', v.loo.toFixed(2) + '×', 'walk-forward ' + v.wf.toFixed(2) + '× · flat ' + v.baselineLoo.toFixed(2) + '×', true],
 ['Range honesty', Math.round(v.coverage.p25 * 100) + '% / ' + Math.round(v.coverage.p10 * 100) + '%', 'inside P25–P75 / P10–P90', false],
 ['Token odds', 'Brier ' + o.brier.toFixed(3), 'base ' + o.brierBase.toFixed(3) + ' · walk-forward ' + o.brierWf.toFixed(3), false],
-['Worth farming', c.worth + ' of ' + c.candidates, 'net beats a 4% T-bill', true],
+['Worth farming', c.worth + ' of ' + c.candidates, 'net beats a 4% T-bill · odds ≥ 75%', true],
 ['Watchlist ranked', c.watchlistCovered + '/' + c.watchlist, 'plus ' + (c.preToken - c.watchlist) + ' below the floor', false]
 ];
 var box = $('#kpis');
