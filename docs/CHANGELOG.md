@@ -103,3 +103,14 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - Dossier text is 64,683 of the 65,536-byte cap, so this is the last content change
   without cutting something.
 - Held under the user's rule: only a massive improvement earns another submission.
+
+### v7, 2026-11-23 — built, not submitted
+
+- Add a farm planner: budget ($1k-$100k), horizon (12/26/52 weeks) and risk filter;
+  allocates across the shortlist (or the top six by net per hour) and shows drop, fees,
+  net, T-bill benchmark and net per hour for the portfolio.
+- Free the source budget by removing the dashboard README (the board now carries the
+  term evidence) and the duplicated method count/farm tables.
+- Dashboard source is 65,279 of the 65,536-byte dossier cap; screenshots are 1280x1024.
+- Model unchanged from v5. Held under the user's rule: only a massive improvement earns
+  another submission.

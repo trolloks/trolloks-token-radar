@@ -27,6 +27,7 @@
   <a href="#/board" data-tab="board">Radar board</a>
   <a href="#/live" data-tab="live">Live token peers</a>
   <a href="#/method" data-tab="method">Method &amp; tests</a>
+  <a href="#/plan" data-tab="plan">Farm planner</a>
   <a href="#/compare" data-tab="compare">Shortlist <span id="pinNav" class="pill">0</span></a>
 </nav>
 
@@ -132,13 +133,10 @@
         <h3>Range honesty</h3>
         <p class="muted" id="rangeText"></p>
         <div class="scoreRow" id="rangeRow"></div>
-        <h3>What the board holds</h3>
-        <table class="mini" id="countTable"><tbody></tbody></table>
       </article>
       <article class="panel">
         <h3>Farm economics</h3>
         <p class="muted">A $10,000 position over 12 weeks. Drop = implied value × 7% × position ÷ TVL. Fees are the plan's gas. The benchmark is the same money in a 4% T-bill for 12 weeks.</p>
-        <div class="scoreRow" id="farmRow"></div>
         <h3>Limits</h3>
         <ul class="limits">
           <li>The snapshot is one day; TVL moves and the band is wider than one point estimate.</li>
@@ -149,6 +147,16 @@
         <p class="muted source" id="provenance"></p>
       </article>
     </div>
+  </section>
+
+  <section id="planView" hidden>
+    <div class="sectionHead"><h2>Farm planner</h2><p>Put a budget across your shortlist (or the top six by net per hour) and compare the total with the same money in a 4% T-bill.</p></div>
+    <div class="toolbar">
+      <label><span>Budget</span><select id="planBudget"><option value="1000">$1,000</option><option value="10000" selected>$10,000</option><option value="50000">$50,000</option><option value="100000">$100,000</option></select></label>
+      <label><span>Horizon</span><select id="planHorizon"><option value="12" selected>12 weeks</option><option value="26">26 weeks</option><option value="52">52 weeks</option></select></label>
+      <label><span>Include</span><select id="planRisk"><option value="all">Worth + marginal</option><option value="worth">Worth only</option></select></label>
+    </div>
+    <div id="planBody"></div>
   </section>
 
   <section id="compareView" hidden>

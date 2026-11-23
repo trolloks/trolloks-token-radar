@@ -43,10 +43,11 @@
     return 1 / (1 + Math.exp(-z));
   }
   function verdictOf(net, odds, benchmark) { return net > benchmark && odds >= 0.5 ? 'worth' : net > 0 ? 'marginal' : 'skip'; }
-  function farm(row, pos) {
+  function farm(row, pos, horizon) {
+    horizon = horizon || 12;
     var drop = row.implied * R.model.dropShare * (pos / row.tvl);
     var net = drop - row.plan.fees;
-    var benchmark = pos * 0.04 * 12 / 52;
+    var benchmark = pos * 0.04 * horizon / 52;
     return { drop: drop, fees: row.plan.fees, net: net, benchmark: benchmark, perHour: net / Math.max(0.1, row.plan.hours), verdict: verdictOf(net, row.odds, benchmark) };
   }
 
@@ -68,6 +69,7 @@
     if (parts[0] === 'live') return { name: 'live' };
     if (parts[0] === 'method') return { name: 'method' };
     if (parts[0] === 'compare') return { name: 'compare', params: params };
+    if (parts[0] === 'plan') return { name: 'plan' };
     return { name: 'board', params: params };
   }
   function show(name) {
@@ -78,6 +80,7 @@
     $('#liveView').hidden = name !== 'live';
     $('#methodView').hidden = name !== 'method';
     $('#compareView').hidden = name !== 'compare';
+    $('#planView').hidden = name !== 'plan';
     $('#detailView').hidden = name !== 'detail';
     document.querySelectorAll('.tabs a').forEach(function (a) {
       if (a.getAttribute('data-tab') === name) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
@@ -624,24 +627,6 @@
       rr.appendChild(d);
     });
     drawCalibration();
-    var ct = $('#countTable');
-    var cb = el('tbody');
-    [['Protocols in the snapshot', R.counts.protocols], ['Records with no token', R.counts.preToken], ['Launch candidates', R.counts.candidates], ['On the watchlist', R.counts.watchlist], ['Live tokens separated', R.counts.live], ['Token records without a price', R.counts.unpriced], ['Excluded: bridge TVL', R.counts.excludedBridge], ['Excluded: exchange product', R.counts.excludedCex], ['Excluded: wrapped / versioned', R.counts.excludedProduct], ['Farm verdict: worth', R.counts.worth], ['Farm verdict: marginal', R.counts.marginal], ['Farm verdict: skip', R.counts.skip]].forEach(function (r) {
-      var tr = el('tr');
-      tr.appendChild(el('td', null, r[0]));
-      tr.appendChild(el('td', 'num', FMT.format(r[1])));
-      cb.appendChild(tr);
-    });
-    ct.replaceChildren(cb);
-    var fr = $('#farmRow');
-    fr.replaceChildren();
-    [['Plan size', '$10,000', 'per farm'], ['Drop share', '7%', 'of implied value'], ['T-bill', '$' + R.model.benchmark.toFixed(0), '12 weeks'], ['Worth', R.counts.worth + ' of ' + R.counts.candidates, 'beats it after fees']].forEach(function (s) {
-      var d = el('div', 'score');
-      d.appendChild(el('span', null, s[0]));
-      d.appendChild(el('b', null, s[1]));
-      d.appendChild(el('em', null, s[2]));
-      fr.appendChild(d);
-    });
     $('#provenance').textContent = 'Source: ' + R.source + '. Snapshot ' + R.asOf + ', watchlist floor $' + FMT.format(R.floor) + '.';
   }
 
@@ -693,6 +678,64 @@
     host.appendChild(links);
   }
 
+  // ---------- farm planner ----------
+  function renderPlan() {
+    var budget = Number($('#planBudget').value) || 10000;
+    var horizon = Number($('#planHorizon').value) || 12;
+    var risk = $('#planRisk').value;
+    var owned = R.rows.filter(function (r) { return pins.has(r.slug); });
+    var chosen = owned.length ? owned : R.rows.filter(function (r) { return r.candidate && r.plan.verdict !== 'skip'; }).sort(function (a, b) { return b.plan.perHour - a.plan.perHour; }).slice(0, 6);
+    if (risk === 'worth') chosen = chosen.filter(function (r) { return r.plan.verdict === 'worth'; });
+    var host = $('#planBody');
+    host.replaceChildren();
+    if (chosen.length === 0) {
+      host.appendChild(el('p', 'empty', owned.length ? 'No shortlisted row passes this filter. Widen it or star other rows.' : 'No candidate passes this filter. Lower the bar or switch the verdict.'));
+      return;
+    }
+    var alloc = budget / chosen.length;
+    var rows = chosen.map(function (r) { return { r: r, f: farm(r, alloc, horizon) }; });
+    var drop = rows.reduce(function (s, x) { return s + x.f.drop; }, 0);
+    var fees = rows.reduce(function (s, x) { return s + x.f.fees; }, 0);
+    var net = drop - fees;
+    var bench = budget * 0.04 * horizon / 52;
+    var hours = Math.max.apply(null, chosen.map(function (r) { return r.plan.hours; }));
+    var verdict = net > bench ? 'worth' : net > 0 ? 'marginal' : 'skip';
+    var totals = el('div', 'terms planTotals');
+    [['Budget', money(budget), chosen.length + ' protocols · ' + money(alloc) + ' each'], ['Drop', money(drop), '7% of implied × share'], ['Fees', money(fees), 'gas across the plan'], ['Net', money(net), verdict.toUpperCase()], ['T-bill', money(bench), horizon + ' weeks at 4%'], ['Net / hour', money(net / Math.max(0.1, hours)), 'parallel farm · ' + hours + ' h']].forEach(function (t) {
+      var d = el('div', 'term' + (t[0] === 'Net' ? ' result' : ''));
+      d.appendChild(el('span', null, t[0]));
+      d.appendChild(el('b', null, t[1]));
+      d.appendChild(el('em', null, t[2]));
+      totals.appendChild(d);
+    });
+    host.appendChild(totals);
+    var note = el('p', 'muted', owned.length ? 'Using your ' + owned.length + ' starred rows.' : 'No starred rows: using the top six candidates by net per hour. Star rows on the board to plan your own.');
+    host.appendChild(note);
+    var table = el('table', 'mini planList');
+    var thead = el('thead');
+    var hr = el('tr');
+    ['Protocol', 'Allocation', 'Drop', 'Fees', 'Net', 'Verdict'].forEach(function (h, i) { hr.appendChild(el('th', i ? 'num' : '', h)); });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var body = el('tbody');
+    rows.forEach(function (x) {
+      var tr = el('tr');
+      var name = el('td');
+      var a = el('a', 'inlineLink', x.r.name);
+      a.href = '#/p/' + encodeURIComponent(x.r.slug);
+      name.appendChild(a);
+      tr.appendChild(name);
+      tr.appendChild(el('td', 'num', money(alloc)));
+      tr.appendChild(el('td', 'num', money(x.f.drop)));
+      tr.appendChild(el('td', 'num', '$' + x.f.fees.toFixed(2)));
+      tr.appendChild(el('td', 'num ' + (x.f.net > 0 ? 'up' : 'dn'), money(x.f.net)));
+      tr.appendChild(el('td', null, x.f.verdict));
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    host.appendChild(table);
+  }
+
   // ---------- boot ----------
   function applyParams(params) {
     if (!params) return;
@@ -712,10 +755,14 @@
     else if (r.name === 'live') renderLive();
     else if (r.name === 'method') renderMethod();
     else if (r.name === 'compare') renderCompare(r.params);
+    else if (r.name === 'plan') renderPlan();
     else detail(r.slug);
     window.scrollTo(0, 0);
   }
   savePins();
+  $('#planBudget').addEventListener('change', renderPlan);
+  $('#planHorizon').addEventListener('change', renderPlan);
+  $('#planRisk').addEventListener('change', renderPlan);
   renderChrome();
   buildControls();
   renderMethod();
