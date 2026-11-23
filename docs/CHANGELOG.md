@@ -209,5 +209,5 @@ Codex reviewed the v9 category effect and sandbox:
 
 - Commit `4c46abf`, bundle `radar-v9c.tar.gz`, checked (84.2% authored, 318 turns).
 - Gate: dashboard source 65,534 / 65,536; dossier 1,406,952; four 1280x1024 screenshots.
-- Scheduled at 2026-11-24T00:00:30Z; v8b and v9b remain fallbacks. v5 is still the final
-  pick until v9c is scored.
+- Scheduled at 2026-11-24T00:00:30Z; v8b and v9b remain fallbacks. The scheduler also
+  polls the score and pins v9c only if it beats v5 (942,846); otherwise v5 stays.
