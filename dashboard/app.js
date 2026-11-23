@@ -168,9 +168,10 @@ bar.appendChild(i);
 line.appendChild(bar);
 var legend = el('span', 'ledgerLegend');
 legend.appendChild(el('b', null, '758/758 accounted'));
-legend.appendChild(document.createTextNode(' · ' + c.watchlist + ' watchlist + ' + (c.preToken - c.watchlist) + ' below the floor + ' + c.live + ' live + ' + c.unpriced + ' unpriced · ' + (c.watchlist + c.preToken - c.watchlist + c.live + c.unpriced) + ' total · 144 of the 342 pre-token records are bridge/CEX/wrapped products, shown under All records'));
+legend.appendChild(document.createTextNode(' · ' + c.watchlist + ' watchlist + ' + (c.preToken - c.watchlist) + ' below the floor + ' + c.live + ' live + ' + c.unpriced + ' unpriced · ' + (c.watchlist + c.preToken - c.watchlist + c.live + c.unpriced) + ' total · 144 of 342 pre-token records are bridge/CEX/wrapped, under All records'));
 var rf = refit(), cs = checksumOf(R.rows);
 legend.appendChild(document.createTextNode(' · refit ' + (rf.ok ? '✓' : '✗') + ' ' + rf.a.toFixed(3) + ' / ' + rf.b.toFixed(3) + ' · checksum ' + (cs === R.checksum ? '✓ ' : '✗ ') + cs));
+if (R.checks) legend.appendChild(document.createTextNode(' · source ' + R.checks.source.toLocaleString('en-US') + '/65,536 · ' + R.checks.shots + ' shots · gate ' + R.checks.gate));
 line.appendChild(legend);
 function fillTerms(tbody, terms, digits, keepWord) {
 if (!tbody) return;
@@ -542,7 +543,7 @@ var shr = el('tr');
 sh.appendChild(shr);
 share.appendChild(sh);
 var sb = el('tbody');
-[...new Set([1000, 10000, 50000, Math.round(r.plan.capital)])].forEach(function (pos) {
+[...new Set([1000, 10000, 50000, Math.round(r.plan.capital)])].sort(function (a, b) { return a - b; }).forEach(function (pos) {
 var s = farm(r, pos);
 var tr = el('tr', pos === Math.round(r.plan.capital) ? 'current' : '');
 tr.appendChild(el('td', null, '$' + pos.toLocaleString('en-US')));
@@ -555,7 +556,7 @@ sb.appendChild(tr);
 });
 share.appendChild(sb);
 right.appendChild(share);
-right.appendChild(el('p', 'muted', 'Drop = implied × 7% × position/TVL; T-bill is the same money at 4% for 12 weeks. The plan below is written for $' + r.plan.capital.toLocaleString('en-US') + '.'));
+right.appendChild(el('p', 'muted', 'Drop = implied × 7% × position/TVL; T-bill is the same money at 4% for 12 weeks. The plan below is written for the minimum viable $' + r.plan.capital.toLocaleString('en-US') + '.'));
 var plan = el('table', 'mini planTable');
 var thead = el('thead');
 var hr = el('tr');

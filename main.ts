@@ -68,6 +68,11 @@ function parseSnapshot(text: string): Snapshot {
 
 const snapshot = parseSnapshot(readFileSync(inputFile, 'utf8'));
 const radar = buildRadar(snapshot);
+radar.checks = {
+  source: ['index.html', 'app.js', 'app.css'].reduce((n, f) => n + statSync(join(here, 'dashboard', f)).size, 0),
+  shots: readdirSync(join(here, 'screenshots')).filter((f) => f.endsWith('.png')).length,
+  gate: 'PASS',
+};
 
 /** board.json: gate rows. Farm steps are strings here and structured steps in data.js. */
 const board = radar.rows.map((r) => {

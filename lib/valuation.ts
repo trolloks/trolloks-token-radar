@@ -150,6 +150,7 @@ export interface Radar {
   rows: Row[];
   live: LivePeer[];
   checksum: string;
+  checks?: { source: number; shots: number; gate: string };
 }
 
 const DAY = 86_400_000;
@@ -445,7 +446,12 @@ const farmPlan = (p: Protocol, implied: number, age: number | null, candidate: b
   const hours = round((20 + 10 + 15 + 10 + weeks * 15 + 10 + 30) / 60, 1);
   const action = actionFor(p);
   const variant = (PLAN_VARIANT.find(([re]) => re.test(p.category ?? '')) ?? [null, GENERIC_VARIANT])[1]!;
-  const planSize = Math.max(1000, Math.min(250000, Math.round(p.tvl * 0.0002)));
+  const perDollar = implied * DROP_SHARE / p.tvl;
+  const hurdle = BENCHMARK_RATE * (HORIZON_WEEKS / 52);
+  const minViable = perDollar > hurdle ? fees / (perDollar - hurdle) : Infinity;
+  const planSize = Number.isFinite(minViable)
+    ? Math.max(5000, Math.min(250000, Math.ceil((minViable * 1.1) / 100) * 100))
+    : Math.max(5000, Math.min(250000, Math.round(p.tvl * 0.0002)));
   const drop = Math.max(0, round(implied * DROP_SHARE * (planSize / p.tvl), 2));
   const net = round(drop - fees, 2);
   const benchmark = round(planSize * BENCHMARK_RATE * (HORIZON_WEEKS / 52), 2);
@@ -718,7 +724,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     source: snapshot.source,
     floor: snapshot.floor,
     model: {
-      name: 'radar-v12 fitted size curve + token odds + browser refit',
+      name: 'radar-v13 fitted size curve + token odds + browser refit',
       value: valueCheck,
       odds: oddsCheck,
       livePeers: live.length,
