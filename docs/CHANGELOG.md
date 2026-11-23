@@ -312,6 +312,9 @@ The codex's remaining criterion-2 note and the leader's farm/range presentation:
   and the "Worth farming at $10,000" wording, both already fixed in d600379; it judged
   the 0-skip farm view and the $250K plans acceptable for criteria 3/4. The review log
   is `/tmp/opencode/codex-review-v12.log`.
-- Commit `cd5a71e`; bundle `de79596f...` (22,350,963 bytes); site check overall true,
-  85.5% authored (2,207/2,581); scheduled 2026-11-24T00:15:30Z; scheduler PID 1406634.
+- The KPI and the method paragraph named only the T-bill while the worth count also
+  requires token odds of at least 75%. Both now state the two conditions. Source
+  64,944/65,536; dossier 65,213.
+- Commit `2f49c6e`; bundle `64e0c011...` (22,693,576 bytes); site check overall true,
+  85.5% authored (2,219/2,593); scheduled 2026-11-24T00:15:30Z; scheduler PID 1415878.
   This is the last quota entry.
