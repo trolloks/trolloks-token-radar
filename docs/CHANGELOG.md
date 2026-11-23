@@ -270,11 +270,13 @@ checksum. v11 adds both:
 - The model label is radar-v11 in the header and the data.
 - Gate all PASS; two builds byte-identical; screenshots 266,607 / 254,950 / 257,475 /
   251,157; dossier 1,439,806.
-- Codex's final review caught one real inconsistency: the planner's Net headline used net
-  vs the T-bill alone, so a plan of marginal rows still printed WORTH. The headline now
-  requires every allocated row to be worth as well; the planner screenshot is rebuilt and
-  the source is 63,849/65,536, dossier 64,138.
-- Commit `a401b5f` on `v11`; bundle `2bfe013e...` (19,690,142 bytes); site check `overall:
-  true` at 85.1% authored (2,151/2,525 lines); scheduled 2026-11-24T00:10:30Z, after v10;
-  the scheduler (PID 1295881) waits for the v10 pick, then reads the current final entry's
-  score and pins the best of v5/v9c/v10/v11.
+- Codex's final review caught three real inconsistencies, all fixed: the planner's Net
+  headline used net vs the T-bill alone (so marginal rows printed WORTH); "Worth only"
+  sliced the top six before testing eligibility (crowding out a seventh); and the detail
+  blamed the T-bill when only the odds failed. The planner now tests every candidate and
+  allocates after filtering; the detail names the odds below 75%. Source 64,269/65,536,
+  dossier 64,538.
+- Commit `fd96b950` on `v11`; bundle `b87a16ed...` (19,707,320 bytes); site check
+  `overall: true` at 85.2% authored (2,157/2,531 lines); scheduled 2026-11-24T00:10:30Z,
+  after v10; the scheduler (PID 1306716) waits for the v10 pick, then reads the current
+  final entry's score and pins the best of v5/v9c/v10/v11.

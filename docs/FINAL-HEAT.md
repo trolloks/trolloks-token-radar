@@ -27,7 +27,7 @@ complete dev rating.
 | v9 | `4689a8f` (branch `v9-category`) | not submitted | - | superseded by v9c |
 | v9c | `4c46abf` (branch `v9-category`) | scheduled 2026-11-24T00:00:30Z | pending | bundle `radar-v9c.tar.gz`; auto-pick if it beats v5 |
 | v10 | `41d044a` (branch `v10`) | scheduled 2026-11-24T00:05:30Z | pending | bundle `radar-v10.tar.gz` (18.99 MB); check overall true, 84.7% authored; scheduler picks best of v5/v9c/v10 |
-| v11 | `a401b5f` (branch `v11`) | scheduled 2026-11-24T00:10:30Z | pending | bundle `radar-v11.tar.gz` (19.69 MB); check overall true, 85.1% authored; planner headline fix; scheduler picks best of current and v11 |
+| v11 | `fd96b950` (branch `v11`) | scheduled 2026-11-24T00:10:30Z | pending | bundle `radar-v11.tar.gz` (19.71 MB); check overall true, 85.2% authored; codex planner/detail fixes; scheduler picks best of current and v11 |
 
 After v9c scores: pick the higher of v5 and v9c (or v8b if it is used) with
 `PUT /api/competitions/token-radar-01/final-entry`, or
@@ -38,9 +38,10 @@ The v10 candidate (`41d044a`) is scheduled at 00:05:30Z, after v9c; the schedule
 (`/tmp/opencode/submit-pick-v10.sh`, PID 1247662) polls both scores and pins the best of
 the current final entry, v9c and v10. It is picked only if its dev rate beats the current
 pick.
-The v11 candidate (`a401b5f`, with the planner headline fix) is scheduled at 00:10:30Z,
-after v10; its scheduler (`/tmp/opencode/submit-pick-v11.sh`, PID 1295881) waits for the
-v10 pick, then reads the current final entry's score and pins the best of v5/v9c/v10/v11.
+The v11 candidate (`fd96b950`, with the planner eligibility/headline and detail verdict
+fixes) is scheduled at 00:10:30Z, after v10; its scheduler
+(`/tmp/opencode/submit-pick-v11.sh`, PID 1306716) waits for the v10 pick, then reads the
+current final entry's score and pins the best of v5/v9c/v10/v11.
 
 ## Final heat
 
