@@ -510,9 +510,12 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     const terms: ValueTerm[] = t.term === 'size' ? ['size'] : ['size', t.term];
     const loo = valueLoo(live, terms);
     const wf = valueWalkForward(live, terms);
-    const kept = t.term === 'size' || t.term === 'category';
-    return { term: t.label, loo: round(loo, 3), wf: round(wf, 3), kept, note: t.note };
+    return { term: t.label, loo: round(loo, 3), wf: round(wf, 3), kept: false, note: t.note };
   });
+  const sizeCheck = valueTermChecks.find((c) => c.term === 'size curve (log TVL)')!;
+  for (const check of valueTermChecks) {
+    check.kept = check === sizeCheck || (check.loo <= sizeCheck.loo && check.wf <= sizeCheck.wf);
+  }
   const value = fitValue(live, ['size', 'category']);
   const looResiduals: number[] = [];
   const looPairs: [number, number][] = [];

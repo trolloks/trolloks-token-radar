@@ -37,9 +37,9 @@
   function year(n) { return n === null ? 'unknown' : n >= 365 ? (n / 365).toFixed(1) + ' yrs' : n + ' days'; }
   function chip(text, cls) { return el('span', 'chip' + (cls ? ' ' + cls : ''), text); }
   function valueAt(tvl, adj) { return tvl * Math.exp(R.model.value.intercept + R.model.value.slope * Math.log(tvl) + (adj || 0)); }
-  function oddsAt(row, growth, ageDays) {
+  function oddsAt(row, growth, ageDays, size) {
     var c = R.model.odds.coef;
-    var z = c[0] + c[1] * row.oddsInput.size + c[2] * Math.log(1 + ageDays / 365) + c[3] * growth + c[4] * row.oddsInput.categoryRate;
+    var z = c[0] + c[1] * (size === undefined ? row.oddsInput.size : size) + c[2] * Math.log(1 + ageDays / 365) + c[3] * growth + c[4] * row.oddsInput.categoryRate;
     return 1 / (1 + Math.exp(-z));
   }
   function verdictOf(net, odds, benchmark) { return net > benchmark && odds >= 0.5 ? 'worth' : net > 0 ? 'marginal' : 'skip'; }
@@ -360,7 +360,7 @@
     reset.type = 'button';
     head.appendChild(reset);
     box.appendChild(head);
-    box.appendChild(el('p', 'sbHint', 'Move TVL to reprice the launch; move growth or age to reprice the token odds.'));
+    box.appendChild(el('p', 'sbHint', 'TVL reprices the launch and the size term; growth and age the rest.'));
     var tvlSlide = el('input'); tvlSlide.type = 'range'; tvlSlide.min = '0'; tvlSlide.max = '1000'; tvlSlide.step = '1';
     var growthSlide = el('input'); growthSlide.type = 'range'; growthSlide.min = '-60'; growthSlide.max = '120'; growthSlide.step = '1';
     var ageSlide = el('input'); ageSlide.type = 'range'; ageSlide.min = '0'; ageSlide.max = '1825'; ageSlide.step = '1';
@@ -379,7 +379,7 @@
       var growth = Number(growthSlide.value) / 100;
       var age = Number(ageSlide.value);
       var implied = Math.max(1, Math.round(valueAt(tvl, r.categoryAdj)));
-      var odds = oddsAt(r, growth, age);
+      var odds = oddsAt(r, growth, age, Math.log(tvl / 1e6));
       tvlOut.textContent = money(tvl);
       growthOut.textContent = pct(growth * 100);
       ageOut.textContent = year(age);
