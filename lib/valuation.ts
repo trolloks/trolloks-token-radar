@@ -445,7 +445,7 @@ const farmPlan = (p: Protocol, implied: number, age: number | null, candidate: b
   const drop = Math.max(0, round(implied * DROP_SHARE * (PLAN_SIZE / p.tvl), 2));
   const net = round(drop - fees, 2);
   const benchmark = round(PLAN_SIZE * BENCHMARK_RATE * (HORIZON_WEEKS / 52), 2);
-  const verdict: Row['plan']['verdict'] = net > benchmark && odds >= 0.5 ? 'worth' : net > 0 ? 'marginal' : 'skip';
+  const verdict: Row['plan']['verdict'] = net > benchmark && odds >= 0.75 ? 'worth' : net > 0 ? 'marginal' : 'skip';
   const steps: PlanStep[] = [
     { action: `Fund a fresh wallet with $${PLAN_SIZE.toLocaleString('en-US')} plus about $${fees} for fees; keep the seed offline.`, cost: `$${PLAN_SIZE.toLocaleString('en-US')} capital`, time: '20 min' },
     { action: `Open ${name} from its official docs on ${chain}, confirm the contract address, and connect the fresh wallet.`, cost: `~$${gas} gas`, time: '10 min' },
@@ -496,31 +496,56 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
   const live = snapshot.protocols.filter((p) => !isPreToken(p) && p.mcap !== null && p.mcap > 0 && p.tvl > 0);
   const watch = new Set(snapshot.watchlist);
 
-  // value model: size curve plus a heavily shrunk category effect; the rest tested and dropped
+  // value model: terms added in order, kept only when both blind tests improve
   const baselineLoo = valueLoo(live, []);
   const baselineWf = valueWalkForward(live, []);
-  const valueTerms: { term: ValueTerm; label: string; note: string }[] = [
-    { term: 'size', label: 'size curve (log TVL)', note: 'kept: sharpest cut in both tests' },
-    { term: 'category', label: 'category effect (shrunk)', note: 'kept: small improvement in both tests with a 20-protocol prior' },
-    { term: 'growth', label: '7-day TVL growth', note: 'not kept: worse in both tests; enters through the odds model' },
-    { term: 'age', label: 'log age', note: 'not kept: worse in both tests; enters through the odds model' },
-    { term: 'chains', label: 'chain count', note: 'not kept: no improvement in either test' },
+  const valueTermChecks: TermCheck[] = [
+    { term: 'flat median multiple (baseline)', loo: round(baselineLoo, 3), wf: round(baselineWf, 3), kept: false, note: 'baseline: no value term' },
   ];
-  const valueTermChecks: TermCheck[] = valueTerms.map((t) => {
-    const terms: ValueTerm[] = t.term === 'size' ? ['size'] : ['size', t.term];
+  const sizeLoo = valueLoo(live, ['size']);
+  const sizeWf = valueWalkForward(live, ['size']);
+  valueTermChecks.push({ term: 'size curve (log TVL)', loo: round(sizeLoo, 3), wf: round(sizeWf, 3), kept: true, note: 'kept: sharpest cut in both tests' });
+  const kept: ValueTerm[] = ['size'];
+  let keptLoo = sizeLoo;
+  let keptWf = sizeWf;
+  const categoryLoo = valueLoo(live, ['size', 'category']);
+  const categoryWf = valueWalkForward(live, ['size', 'category']);
+  const categoryKept = categoryLoo <= keptLoo && categoryWf <= keptWf;
+  valueTermChecks.push({ term: 'category effect (shrunk)', loo: round(categoryLoo, 3), wf: round(categoryWf, 3), kept: categoryKept, note: 'kept only when both blind tests improve with a 20-protocol prior' });
+  if (categoryKept) {
+    kept.push('category');
+    keptLoo = categoryLoo;
+    keptWf = categoryWf;
+  }
+  const extraTerms: { term: ValueTerm; label: string; note: string }[] = [
+    { term: 'growth', label: '7-day TVL growth', note: 'kept only when both blind tests improve; enters the odds model either way' },
+    { term: 'age', label: 'log age', note: 'kept only when both blind tests improve; enters the odds model either way' },
+    { term: 'chains', label: 'chain count', note: 'kept only when both blind tests improve' },
+  ];
+  for (const extra of extraTerms) {
+    const terms: ValueTerm[] = [...kept, extra.term];
     const loo = valueLoo(live, terms);
     const wf = valueWalkForward(live, terms);
-    return { term: t.label, loo: round(loo, 3), wf: round(wf, 3), kept: false, note: t.note };
-  });
-  const sizeCheck = valueTermChecks.find((c) => c.term === 'size curve (log TVL)')!;
-  for (const check of valueTermChecks) {
-    check.kept = check === sizeCheck || (check.loo <= sizeCheck.loo && check.wf <= sizeCheck.wf);
+    const isKept = loo <= keptLoo && wf <= keptWf;
+    valueTermChecks.push({ term: extra.label, loo: round(loo, 3), wf: round(wf, 3), kept: isKept, note: extra.note });
+    if (isKept) {
+      kept.push(extra.term);
+      keptLoo = loo;
+      keptWf = wf;
+    }
   }
-  const value = fitValue(live, ['size', 'category']);
+  const controlRuns = [37, 53, 71, 89, 107].map((shift) => {
+    const control = live.map((p, i) => ({ ...p, ch7: live[(i + shift) % live.length]?.ch7 ?? p.ch7 }));
+    return [valueLoo(control, [...kept, 'growth']), valueWalkForward(control, [...kept, 'growth'])] as [number, number];
+  });
+  const controlLoo = median(controlRuns.map(([loo]) => loo));
+  const controlWf = median(controlRuns.map(([, wf]) => wf));
+  valueTermChecks.push({ term: 'control: 5 shuffled growths (must not help)', loo: round(controlLoo, 3), wf: round(controlWf, 3), kept: false, note: 'must not help: shuffled growth is noise' });
+  const value = fitValue(live, kept);
   const looResiduals: number[] = [];
   const looPairs: [number, number][] = [];
   for (let i = 0; i < live.length; i++) {
-    const model = fitValue(live.filter((_, j) => j !== i), ['size', 'category']);
+    const model = fitValue(live.filter((_, j) => j !== i), kept);
     const p = live[i]!;
     const est = model.predict(p);
     looPairs.push([est, p.mcap!]);
@@ -544,7 +569,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     intercept: round(intercept, 3),
     multipleAt100m: round(Math.exp(intercept + slope * Math.log(1e8)), 3),
     loo: round(medianFactor(looPairs), 3),
-    wf: round(valueWalkForward(live, ['size', 'category']), 3),
+    wf: round(valueWalkForward(live, kept), 3),
     baselineLoo: round(baselineLoo, 3),
     baselineWf: round(baselineWf, 3),
     bands,

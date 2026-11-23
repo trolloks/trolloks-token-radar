@@ -42,7 +42,7 @@
     var z = c[0] + c[1] * (size === undefined ? row.oddsInput.size : size) + c[2] * Math.log(1 + ageDays / 365) + c[3] * growth + c[4] * row.oddsInput.categoryRate;
     return 1 / (1 + Math.exp(-z));
   }
-  function verdictOf(net, odds, benchmark) { return net > benchmark && odds >= 0.5 ? 'worth' : net > 0 ? 'marginal' : 'skip'; }
+  function verdictOf(net, odds, benchmark) { return net > benchmark && odds >= 0.75 ? 'worth' : net > 0 ? 'marginal' : 'skip'; }
   function farm(row, pos, horizon) {
     horizon = horizon || 12;
     var drop = row.implied * R.model.dropShare * (pos / row.tvl);
