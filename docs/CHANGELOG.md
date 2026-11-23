@@ -61,3 +61,14 @@ Rank is the leaderboard row; the rate is the Bradley-Terry win rate against the 
   farm plans changed shape, not just wording.
 - Commit `3273022`, submission `01a207fb-7ddf-7329-a8d3-60f14b7ac5ea`, receipt 10:37:31 UTC.
 - Transcript gate locally: 81.6% of counted lines authored, 115 assistant turns, run record pass.
+
+### v4, 2026-11-23
+
+- Fit the growth weight (0.10) and maturity floor (0.80) on the held-out folds; the
+  held-out median miss improves from 4.98x to 4.82x and rank correlation stays at 0.41.
+- Add a held-out calibration chart (predicted vs actual, log-log) to the method page.
+- Add a value-map chart to the board header and an aggregate launch-value headline
+  ($4.89B across the 198 candidates).
+- Add three calibrated scenarios per protocol (P25 conservative, base, P75 stretch).
+- Account for all 758 protocols explicitly: 342 pre-token + 128 live + 288 unpriced.
+- Add a factual coverage/model/plans/page line under the flow strip.

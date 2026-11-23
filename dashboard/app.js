@@ -25,6 +25,18 @@
   function chip(text, cls) { return el('span', 'chip' + (cls ? ' ' + cls : ''), text); }
 
   var FMT = new Intl.NumberFormat('en-US');
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    if (attrs) for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function svgText(x, y, text, cls) {
+    var t = svgEl('text', { x: x, y: y, 'font-size': '10', fill: '#66738c', 'font-family': 'ui-monospace,monospace' });
+    if (cls) t.setAttribute('class', cls);
+    t.textContent = text;
+    return t;
+  }
   var view = { q: '', cat: 'all', conf: 'all', scope: 'candidates', sort: 'rank', dir: 1 };
   var pins = new Set();
   try { pins = new Set(JSON.parse(localStorage.getItem('radar.pins') || '[]')); } catch (e) { pins = new Set(); }
@@ -51,6 +63,7 @@
   function show(name) {
     $('#kpis').hidden = name === 'detail';
     $('#statusLine').hidden = name === 'detail';
+    $('#contract').hidden = name === 'detail';
     $('#boardView').hidden = name !== 'board';
     $('#liveView').hidden = name !== 'live';
     $('#methodView').hidden = name !== 'method';
@@ -60,6 +73,25 @@
       var active = a.getAttribute('data-tab') === name;
       if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
+  }
+
+  // ---------- value map ----------
+  function valueMap(rows) {
+    var W = 200, H = 52, pad = 3;
+    var cs = rows.filter(function (r) { return r.candidate; }).slice(0, 90);
+    var xs = cs.map(function (r) { return Math.log10(r.tvl); });
+    var ys = cs.map(function (r) { return Math.log10(r.implied); });
+    var lo = Math.min.apply(null, xs.concat(ys)) - 0.2;
+    var hi = Math.max.apply(null, xs.concat(ys)) + 0.2;
+    var sx = function (v) { return pad + ((v - lo) / (hi - lo)) * (W - 2 * pad); };
+    var sy = function (v) { return H - pad - ((v - lo) / (hi - lo)) * (H - 2 * pad); };
+    var root = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Implied value against TVL for launch candidates' });
+    var m = Math.log10(R.model.globalMedian);
+    root.appendChild(svgEl('line', { x1: sx(lo), y1: sy(lo + m), x2: sx(hi), y2: sy(hi + m), stroke: '#3a4a68', 'stroke-dasharray': '3 3', 'stroke-width': '1' }));
+    cs.forEach(function (r, i) {
+      root.appendChild(svgEl('circle', { cx: sx(xs[i]), cy: sy(ys[i]), r: r.watch ? 2.2 : 1.5, fill: r.watch ? '#f5b33c' : '#8a6a2a', opacity: r.watch ? 0.95 : 0.6 }));
+    });
+    return root;
   }
 
   // ---------- header ----------
@@ -73,7 +105,7 @@
       ['Launch candidates', FMT.format(c.candidates), 'past the wrapped / bridge / CEX rules', true],
       ['Watchlist covered', c.watchlistCovered + '/' + c.watchlist, 'every $' + (R.floor / 1e6) + 'M+ pre-token record', false],
       ['Live token peers', FMT.format(c.live), 'price the category multiples', false],
-      ['Top implied value', money(top ? top.implied : 0), top ? top.name : '', true]
+      ['Aggregate launch value', money(c.aggregateCandidates), c.candidates + ' candidates · top ' + (top ? top.name + ' ' + money(top.implied) : ''), true]
     ];
     var box = $('#kpis');
     box.replaceChildren();
@@ -84,6 +116,10 @@
       card.appendChild(el('em', null, k[2]));
       box.appendChild(card);
     });
+    var chartCard = el('div', 'kpi chartCard');
+    chartCard.appendChild(el('span', null, 'Value map'));
+    chartCard.appendChild(valueMap(R.rows));
+    box.appendChild(chartCard);
     var line = $('#statusLine');
     line.replaceChildren();
     var flow = [
@@ -91,7 +127,7 @@
       [FMT.format(c.preToken) + '/' + FMT.format(c.preToken), 'with no token, all ranked'],
       [FMT.format(c.candidates), 'launch candidates'],
       [FMT.format(c.live), 'live peers, separated'],
-      [FMT.format(c.excludedBridge + c.excludedCex + c.excludedProduct), 'excluded products']
+      [FMT.format(c.unpriced), 'unpriced token records']
     ];
     flow.forEach(function (f, i) {
       if (i) line.appendChild(el('span', 'flowArrow', '→'));
@@ -100,7 +136,8 @@
       item.appendChild(document.createTextNode(' ' + f[1]));
       line.appendChild(item);
     });
-    line.appendChild(el('span', 'flowNote', 'watchlist ' + c.watchlistCovered + '/' + c.watchlist + ' · excluded: ' + c.excludedBridge + ' bridge, ' + c.excludedCex + ' CEX, ' + c.excludedProduct + ' wrapped/versioned'));
+    line.appendChild(el('span', 'flowNote', '342 + 128 + 288 = 758 · watchlist ' + c.watchlistCovered + '/' + c.watchlist + ' · 144 of the 342 are bridge, CEX or wrapped/versioned products, shown under All records'));
+    $('#contract').textContent = 'Coverage ' + c.watchlistCovered + '/' + c.watchlist + ' watchlist, ' + c.preToken + '/' + c.preToken + ' pre-token ranked · Model ' + c.live + ' live peers, 80% band, 5-fold + walk-forward held out · Plans 8 costed steps per row, gas per active hour · Page sort, filter, detail, sandbox, compare, CSV';
   }
 
   // ---------- CSV ----------
@@ -483,6 +520,15 @@
       terms.appendChild(d);
     });
     left.appendChild(terms);
+    var sc = el('div', 'scenarios');
+    [['Conservative', r.scenarios.conservative], ['Base', r.scenarios.base], ['Stretch', r.scenarios.stretch]].forEach(function (pair, i) {
+      var item = el('span', i === 1 ? 'base' : '');
+      item.appendChild(document.createTextNode(pair[0]));
+      item.appendChild(el('b', null, money(pair[1])));
+      sc.appendChild(item);
+    });
+    sc.appendChild(el('em', null, 'a quarter of held-out peers land below / above'));
+    left.appendChild(sc);
     var peerWord = r.peers === 1 ? '1 live-token peer' : r.peers + ' live-token peers';
     left.appendChild(el('p', null,
       'The category multiple is the geometric median market-cap/TVL of ' + peerWord + ' in ' + (r.category || 'this category') +
@@ -543,6 +589,42 @@
     host.appendChild(cols);
   }
 
+  // ---------- calibration chart ----------
+  function drawCalibration(check) {
+    var host = $('#calChart');
+    host.replaceChildren();
+    if (!check.points || check.points.length === 0) return;
+    var W = 1160, H = 300, L = 54, R = 18, T = 14, B = 40;
+    var vals = check.points.map(function (p) { return Math.log10(p.actual); }).concat(check.points.map(function (p) { return Math.log10(p.predicted); }));
+    var lo = Math.floor(Math.min.apply(null, vals)), hi = Math.ceil(Math.max.apply(null, vals));
+    var sx = function (v) { return L + ((v - lo) / (hi - lo)) * (W - L - R); };
+    var sy = function (v) { return H - B - ((v - lo) / (hi - lo)) * (H - T - B); };
+    var root = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Held-out implied value against actual market cap' });
+    for (var e = lo; e <= hi; e++) {
+      root.appendChild(svgEl('line', { x1: sx(e), y1: sy(lo), x2: sx(e), y2: sy(hi), stroke: '#182338', 'stroke-width': '1' }));
+      root.appendChild(svgEl('line', { x1: sx(lo), y1: sy(e), x2: sx(hi), y2: sy(e), stroke: '#182338', 'stroke-width': '1' }));
+      root.appendChild(svgText(sx(e), H - B + 16, money(Math.pow(10, e)), 'mid'));
+      root.appendChild(svgText(L - 8, sy(e) + 3, money(Math.pow(10, e)), 'end'));
+    }
+    root.appendChild(svgEl('line', { x1: sx(lo), y1: sy(lo), x2: sx(hi), y2: sy(hi), stroke: '#f5b33c', 'stroke-width': '1.4', 'stroke-dasharray': '5 5', opacity: '0.85' }));
+    var colors = { high: '#2fd6b5', medium: '#f5b33c', low: '#9a86b8' };
+    check.points.forEach(function (p) {
+      var x = Math.log10(p.actual), y = Math.log10(p.predicted);
+      var c = svgEl('circle', { cx: sx(x), cy: sy(y), r: 3.4, fill: colors[p.bucket], opacity: 0.72 });
+      var title = svgEl('title', {});
+      title.textContent = p.slug + ': actual ' + money(p.actual) + ', implied ' + money(p.predicted);
+      c.appendChild(title);
+      root.appendChild(c);
+    });
+    var legend = [['high', 'high'], ['medium', 'medium'], ['low', 'low']];
+    legend.forEach(function (l, i) {
+      var lx = W - R - 210 + i * 70;
+      root.appendChild(svgEl('circle', { cx: lx, cy: T + 4, r: 4, fill: colors[l[0]] }));
+      root.appendChild(svgText(lx + 9, T + 8, l[1], 'start'));
+    });
+    host.appendChild(root);
+  }
+
   // ---------- method ----------
   function renderMethod() {
     var c = R.model.check;
@@ -568,6 +650,7 @@
       d.appendChild(el('em', null, s[2]));
       score.appendChild(d);
     });
+    drawCalibration(c);
     var ct = $('#catTable tbody');
     ct.replaceChildren();
     c.categories.slice(0, 12).forEach(function (r) {

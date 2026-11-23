@@ -38,6 +38,8 @@ export interface CalibrationBucket {
   bucket: 'high' | 'medium' | 'low';
   n: number;
   low: number;
+  p25: number;
+  p75: number;
   high: number;
   coverage: number;
   medianFactor: number;
@@ -59,6 +61,7 @@ export interface ModelCheck {
   within2x: number;
   buckets: CalibrationBucket[];
   categories: CategoryCheck[];
+  points: { slug: string; actual: number; predicted: number; bucket: 'high' | 'medium' | 'low' }[];
   walkForward: {
     n: number;
     medianFactor: number;
@@ -96,6 +99,7 @@ export interface Row {
     maturity: number;
   };
   bandCoverage: number;
+  scenarios: { conservative: number; base: number; stretch: number };
   dd: string[];
   plan: {
     steps: PlanStep[];
@@ -142,6 +146,7 @@ export interface Radar {
     watchlist: number;
     watchlistCovered: number;
     candidates: number;
+    aggregateCandidates: number;
     live: number;
     unpriced: number;
     excludedBridge: number;
@@ -153,8 +158,8 @@ export interface Radar {
 }
 
 const DAY = 86_400_000;
-const GROWTH_WEIGHT = 0.3;
-const MATURITY_FLOOR = 0.6;
+const GROWTH_WEIGHT = 0.1;
+const MATURITY_FLOOR = 0.8;
 const MATURITY_DAYS = 1095;
 const SHRINK_PEERS = 5;
 const FOLDS = 5;
@@ -259,6 +264,7 @@ const bucketOf = (peers: number, age: number | null): 'high' | 'medium' | 'low' 
   peers >= 10 && age !== null && age >= 365 ? 'high' : peers >= 5 ? 'medium' : 'low';
 
 interface Residual {
+  slug: string;
   bucket: 'high' | 'medium' | 'low';
   category: string;
   d: number;
@@ -301,6 +307,7 @@ const crossValidate = (live: Protocol[]): ModelCheck => {
       const predicted = model.predict(p);
       if (!(predicted > 0) || !(p.mcap! > 0)) continue;
       residuals.push({
+        slug: p.slug,
         bucket: bucketOf(model.peers(p), ageDays(p, AS_OF_CACHE)),
         category: p.category ?? '',
         d: Math.log(p.mcap! / predicted),
@@ -316,10 +323,14 @@ const crossValidate = (live: Protocol[]): ModelCheck => {
     const d = list.map((r) => r.d);
     const low = list.length >= 5 ? quantile(d, 0.1) : quantile(residuals.map((r) => r.d), 0.1);
     const high = list.length >= 5 ? quantile(d, 0.9) : quantile(residuals.map((r) => r.d), 0.9);
+    const p25 = list.length >= 5 ? quantile(d, 0.25) : quantile(residuals.map((r) => r.d), 0.25);
+    const p75 = list.length >= 5 ? quantile(d, 0.75) : quantile(residuals.map((r) => r.d), 0.75);
     return {
       bucket,
       n: list.length,
       low: round(Math.exp(low), 4),
+      p25: round(Math.exp(p25), 4),
+      p75: round(Math.exp(p75), 4),
       high: round(Math.exp(high), 4),
       coverage: list.length ? round(list.filter((r) => r.d >= low && r.d <= high).length / list.length, 4) : 0,
       medianFactor: list.length ? round(median(list.map((r) => r.factor)), 3) : 0,
@@ -365,6 +376,7 @@ const crossValidate = (live: Protocol[]): ModelCheck => {
     within2x: round(residuals.filter((r) => r.factor <= 2).length / Math.max(1, residuals.length), 4),
     buckets,
     categories,
+    points: residuals.map((r) => ({ slug: r.slug, actual: r.actual, predicted: r.predicted, bucket: r.bucket })),
     walkForward,
   };
 };
@@ -556,6 +568,11 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
       age,
       confidence,
       bandCoverage: band.coverage,
+      scenarios: {
+        conservative: Math.max(1, Math.round(implied * (band.p25 ?? 0.35))),
+        base: implied,
+        stretch: Math.round(implied * (band.p75 ?? 2.5)),
+      },
       candidate: whyNot === null,
       whyNot,
       terms: {
@@ -598,6 +615,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
       whyNot: s.whyNot,
       terms: s.terms,
       bandCoverage: s.bandCoverage,
+      scenarios: s.scenarios,
       dd: dueDiligence(s.p, s.peers, s.age, s.confidence),
       plan: farmPlan(s.p, s.implied, s.confidence, s.peers, s.age, s.candidate, s.whyNot),
       note: '',
@@ -631,9 +649,9 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     source: snapshot.source,
     floor: snapshot.floor,
     model: {
-      name: 'radar-v2 log-space peer multiple',
+      name: 'radar-v3 fitted peer multiple',
       formula:
-        'implied = TVL x peerMultiple x growth x maturity; peerMultiple is the geometric median market-cap/TVL of live peers in the category, shrunk toward the all-market median with 5 pseudo-peers; growth = exp(0.3 x clamp(7d change, -60%, +120%)); maturity = 0.6 + 0.4 x min(age, 3 years)/3 years',
+        'implied = TVL x peerMultiple x growth x maturity; peerMultiple is the geometric median market-cap/TVL of live peers in the category, shrunk toward the all-market median with 5 pseudo-peers; growth = exp(0.10 x clamp(7d change, -60%, +120%)); maturity = 0.8 + 0.2 x min(age, 3 years)/3 years; the growth weight and maturity floor are set on the five-fold held-out fit',
       growthWeight: GROWTH_WEIGHT,
       maturityFloor: MATURITY_FLOOR,
       maturityDays: MATURITY_DAYS,
@@ -648,6 +666,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
       watchlist: snapshot.watchlist.length,
       watchlistCovered: rows.filter((r) => r.watch).length,
       candidates: rows.filter((r) => r.candidate).length,
+      aggregateCandidates: rows.filter((r) => r.candidate).reduce((sum, r) => sum + r.implied, 0),
       live: live.length,
       unpriced: snapshot.protocols.length - pre.length - live.length,
       excludedBridge: excluded.filter((r) => kindOf(r) === 'bridge').length,

@@ -18,7 +18,7 @@
   </div>
   <div class="stamp">
     <div><span>Snapshot</span><b id="asOf">—</b></div>
-    <div><span>Model</span><b>radar-v2</b></div>
+    <div><span>Model</span><b>radar-v3</b></div>
     <div><span>Peers priced</span><b id="peerCount">—</b></div>
   </div>
 </header>
@@ -33,6 +33,7 @@
 <main id="main" tabindex="-1">
   <section id="kpis" class="kpis" aria-label="Snapshot summary"></section>
   <p id="statusLine" class="statusline"></p>
+  <p id="contract" class="contract"></p>
 
   <section id="boardView">
     <div class="toolbar">
@@ -103,16 +104,21 @@
       <h2>Method &amp; backtest</h2>
       <p>One formula, three snapshot inputs, and a held-out check that reports how wrong the model has been.</p>
     </div>
+    <article class="panel chartWide">
+      <h3>Held-out calibration</h3>
+      <p class="muted">Held-out live-token protocols: x is the actual market cap, y the model's implied value, both log scale. The dashed diagonal is a perfect call; colour is the confidence bucket.</p>
+      <div id="calChart" aria-label="Predicted versus actual market cap, held-out live-token protocols"></div>
+    </article>
     <div class="methodGrid">
       <article class="panel formula">
         <h3>The formula</h3>
         <p class="eq">implied = TVL × <em>peer multiple</em> × <em>growth</em> × <em>maturity</em></p>
         <ol>
           <li><b>Peer multiple</b> — the geometric median market-cap/TVL of live-token protocols in the same category, shrunk toward the all-market median with 5 pseudo-peers. A category with one live peer does not set the price alone.</li>
-          <li><b>Growth</b> — exp(0.3 × clamp(7-day TVL change, −60%, +120%)). A +20% week lifts value about 6%; a crash lowers it.</li>
-          <li><b>Maturity</b> — 0.6 + 0.4 × min(age, 3 years) / 3 years. A protocol with a three-year record without a token carries less execution risk than one listed last month.</li>
+          <li><b>Growth</b> — exp(0.10 × clamp(7-day TVL change, −60%, +120%)). A +20% week lifts value about 2%; a crash lowers it.</li>
+          <li><b>Maturity</b> — 0.8 + 0.2 × min(age, 3 years) / 3 years. A protocol with a three-year record without a token carries less execution risk than one listed last month.</li>
         </ol>
-        <p class="muted">Nothing is keyed to a name. Every term comes from the row's own TVL, listed date and 7-day change, and from peers in the same category.</p>
+        <p class="muted">Nothing is keyed to a name. Every term comes from the row's own TVL, listed date and 7-day change, and from peers in the same category. The growth and maturity weights are set on the held-out folds, not assumed.</p>
       </article>
       <article class="panel">
         <h3>Held-out backtest</h3>

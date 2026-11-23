@@ -25,7 +25,7 @@ h1 span{color:var(--amber)}
 .tabs a[aria-current=page]{color:var(--text);border-bottom-color:var(--amber)}
 .tabs a:hover{color:var(--text)}
 main{max-width:1440px;margin:0 auto;padding:20px 32px 40px}
-.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr) 1.6fr;gap:10px}
 .kpi{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-height:84px}
 .kpi span{display:block;font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
 .kpi b{display:block;margin-top:7px;font:600 25px/1 var(--mono);letter-spacing:-.02em}
@@ -184,3 +184,14 @@ table.mini td.num{font-family:var(--mono)}
 .compareTable td:first-child{color:var(--mute);white-space:nowrap}
 .compareTable tr:last-child td{text-align:left;line-height:1.45;color:var(--mute)}
 .inlineLink{color:var(--amber);text-decoration:none;border-bottom:1px solid #6a5420}
+
+.contract{margin:0 0 14px;color:var(--dim);font-size:11px;line-height:1.5}
+.kpi.chartCard{display:flex;flex-direction:column;justify-content:space-between;padding:10px 10px 8px}
+.kpi.chartCard svg{width:100%;height:52px;display:block}
+.chartWide{margin-bottom:14px}
+#calChart svg{width:100%;height:auto;display:block}
+
+.scenarios{display:flex;gap:16px;flex-wrap:wrap;align-items:baseline;margin:10px 0 0;background:#0b1220;border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:11px;color:var(--dim)}
+.scenarios span b{font-family:var(--mono);color:var(--text);margin-left:6px;font-size:12px}
+.scenarios span.base b{color:var(--amber2)}
+.scenarios em{font-style:normal;margin-left:auto;font-size:10.5px;color:var(--dim)}
