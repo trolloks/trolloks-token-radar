@@ -23,9 +23,10 @@ complete dev rating.
 | --- | --- | --- | --- | --- |
 | v5 | `01a2081c-7069-7016-b6be-587e77d750a2` | 942,846 | 927,048 - 958,643 | final pick |
 | v7 | `01a2082f-f28f-737e-b47b-3664d79672c8` | 939,310 | 922,935 - 955,686 | not picked |
-| v8b | scheduled 2026-11-24T00:00:30Z | pending | pending | bundle `radar-v8b.tar.gz` |
+| v8b | `4615746` | not submitted | - | fallback bundle `radar-v8b.tar.gz` |
+| v9 | `4689a8f` (branch `v9-category`) | scheduled 2026-11-24T00:00:30Z | pending | bundle `radar-v9.tar.gz` |
 
-After v8b scores: pick the higher of v5 and v8b with
+After v9 scores: pick the higher of v5 and v9 (or v8b if it is used) with
 `PUT /api/competitions/token-radar-01/final-entry`, or
 `node cli/makefun.mjs final token-radar-01 <submission id>`. A later entry does not replace
 the pick by itself.
