@@ -125,3 +125,16 @@ Rebuilt the model to the standard the leader's public artifact showed:
   worsens; not a clear enough gain to replace the best entry. The value model is near its
   ceiling on this snapshot.
 - Quota after v7: 6 entries made, 4 left in total, today's 5 spent.
+
+### v8, 2026-11-23 — built, waiting for the next quota day
+
+- Move the full value and token-odds term tables onto the board, above the table, so
+  the primary screenshot carries the kept/dropped evidence the leader's artifact has.
+- Tighten the table rows (line-height and padding) so the board still shows six rows
+  below the model evidence.
+- Keep the planner as the fourth screenshot; the method page keeps the chart and the
+  formulas, with the term detail now on the board.
+- Gate: dashboard source 64,926 of 65,536 bytes; dossier 1,394,979 bytes; four
+  1280x1024 screenshots; verify.mjs all pass.
+- Quota: today's 5 spent, 4 entries left in total. Submit v8 after 2026-11-24T00:00:00Z
+  and keep v5 pinned until v8 is measured.
