@@ -52,6 +52,7 @@ if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
 if (n >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
 return '$' + Math.round(n);
 }
+function moneyEach(n) { return '$' + Math.round(n).toLocaleString('en-US'); }
 function pct(n) { return n === null || n === undefined ? '—' : (n > 0 ? '+' : '') + n.toFixed(1) + '%'; }
 function multi(n) { return (n >= 10 ? n.toFixed(1) : n >= 1 ? n.toFixed(2) : n.toFixed(3)) + '×'; }
 function year(n) { return n === null ? 'unknown' : n >= 365 ? (n / 365).toFixed(1) + ' yrs' : n + ' days'; }
@@ -718,7 +719,7 @@ var hours = rows.reduce(function (s, x) { return s + x.r.plan.hours; }, 0);
 var worthRows = rows.filter(function (x) { return x.f.verdict === 'worth'; }).length;
 var verdict = net > bench && worthRows === rows.length ? 'worth' : net > 0 ? 'marginal' : 'skip';
 var totals = el('div', 'terms planTotals');
-[['Budget', money(budget), chosen.length + ' protocols · ' + money(alloc) + ' each'], ['Drop', money(drop), '7% of implied × share'], ['Fees', money(fees), 'gas across the plan'], ['Net', money(net), verdict.toUpperCase()], ['T-bill', money(bench), horizon + ' weeks at 4%'], ['Net / hour', money(net / Math.max(0.1, hours)), 'sum of active hours · ' + hours.toFixed(1) + ' h']].forEach(function (t) {
+[['Budget', money(budget), chosen.length + ' protocols · ' + moneyEach(alloc) + ' each'], ['Drop', money(drop), '7% of implied × share'], ['Fees', money(fees), 'gas across the plan'], ['Net', money(net), verdict.toUpperCase()], ['T-bill', money(bench), horizon + ' weeks at 4%'], ['Net / hour', money(net / Math.max(0.1, hours)), 'sum of active hours · ' + hours.toFixed(1) + ' h']].forEach(function (t) {
 var d = el('div', 'term' + (t[0] === 'Net' ? ' result' : ''));
 d.appendChild(el('span', null, t[0]));
 d.appendChild(el('b', null, t[1]));
@@ -742,7 +743,7 @@ var a = el('a', 'inlineLink', x.r.name);
 a.href = '#/p/' + encodeURIComponent(x.r.slug);
 name.appendChild(a);
 tr.appendChild(name);
-tr.appendChild(el('td', 'num', money(alloc)));
+tr.appendChild(el('td', 'num', moneyEach(alloc)));
 tr.appendChild(el('td', 'num', money(x.f.drop)));
 tr.appendChild(el('td', 'num', '$' + x.f.fees.toFixed(2)));
 tr.appendChild(el('td', 'num ' + (x.f.net > 0 ? 'up' : 'dn'), money(x.f.net)));
