@@ -82,6 +82,8 @@ export interface Row {
   high: number;
   p25: number;
   p75: number;
+  rankLow: number;
+  rankHigh: number;
   odds: number;
   multiple: number;
   watch: boolean;
@@ -443,14 +445,15 @@ const farmPlan = (p: Protocol, implied: number, age: number | null, candidate: b
   const hours = round((20 + 10 + 15 + 10 + weeks * 15 + 10 + 30) / 60, 1);
   const action = actionFor(p);
   const variant = (PLAN_VARIANT.find(([re]) => re.test(p.category ?? '')) ?? [null, GENERIC_VARIANT])[1]!;
-  const drop = Math.max(0, round(implied * DROP_SHARE * (PLAN_SIZE / p.tvl), 2));
+  const planSize = Math.max(1000, Math.min(250000, Math.round(p.tvl * 0.0002)));
+  const drop = Math.max(0, round(implied * DROP_SHARE * (planSize / p.tvl), 2));
   const net = round(drop - fees, 2);
-  const benchmark = round(PLAN_SIZE * BENCHMARK_RATE * (HORIZON_WEEKS / 52), 2);
+  const benchmark = round(planSize * BENCHMARK_RATE * (HORIZON_WEEKS / 52), 2);
   const verdict: Row['plan']['verdict'] = net > benchmark && odds >= 0.75 ? 'worth' : net > 0 ? 'marginal' : 'skip';
   const steps: PlanStep[] = [
-    { action: `Fund a fresh wallet with $${PLAN_SIZE.toLocaleString('en-US')} plus about $${fees} for fees; keep the seed offline.`, cost: `$${PLAN_SIZE.toLocaleString('en-US')} capital`, time: '20 min' },
+    { action: `Fund a fresh wallet with $${planSize.toLocaleString('en-US')} plus about $${fees} for fees; keep the seed offline.`, cost: `$${planSize.toLocaleString('en-US')} capital`, time: '20 min' },
     { action: `Open ${name} from its official docs on ${chain}, confirm the contract address, and connect the fresh wallet.`, cost: `~$${gas} gas`, time: '10 min' },
-    { action: `${action} with $${PLAN_SIZE.toLocaleString('en-US')}; read the fee and withdrawal terms before signing.`, cost: `~$${gas} gas + protocol fee`, time: '15 min' },
+    { action: `${action} with $${planSize.toLocaleString('en-US')}; read the fee and withdrawal terms before signing.`, cost: `~$${gas} gas + protocol fee`, time: '15 min' },
     { action: `${variant.middle}.`, cost: `~$${gas} gas`, time: '10 min' },
     { action: `Do one qualifying action a week for ${weeks} weeks - deposit, borrow, swap or vote - and keep leverage low.`, cost: `~$${weekly} gas/week`, time: `${weeks * 15} min total` },
     { action: `Record wallet, tx hashes, dates and the protocol's TVL in a sheet; re-check eligibility only on the protocol's own site.`, cost: '$0', time: '10 min/month' },
@@ -461,7 +464,7 @@ const farmPlan = (p: Protocol, implied: number, age: number | null, candidate: b
     if (step.action.length < 20) step.action = `${step.action} (confirm the terms first).`;
     if (step.action.length > 600) step.action = `${step.action.slice(0, 590)}...`;
   }
-  return { steps, capital: PLAN_SIZE, fees, hours, weeks, drop, net, perHour: round(net / Math.max(0.1, hours), 2), benchmark, verdict };
+  return { steps, capital: planSize, fees, hours, weeks, drop, net, perHour: round(net / Math.max(0.1, hours), 2), benchmark, verdict };
 };
 
 const CATEGORY_DD: [RegExp, string[]][] = [
@@ -661,6 +664,8 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
       high: s.high,
       p25: s.p25,
       p75: s.p75,
+      rankLow: 1 + scored.filter((o) => o.implied > s.p75).length,
+      rankHigh: scored.filter((o) => o.implied >= s.p25).length,
       odds: round(s.odds, 3),
       multiple: round(s.implied / s.p.tvl, 4),
       watch: watch.has(s.p.slug),

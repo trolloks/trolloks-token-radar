@@ -270,7 +270,7 @@ tr.appendChild(starTd);
 
 var rank = el('td', 'rank');
 rank.appendChild(el('b', null, r.candidate ? '#' + r.candidateRank : '—'));
-rank.appendChild(el('div', 'subline', '#' + r.rank + ' overall'));
+rank.appendChild(el('div', 'subline', '#' + r.rank + ' (' + r.rankLow + '–' + r.rankHigh + ')'));
 tr.appendChild(rank);
 
 var name = el('td');
@@ -488,6 +488,7 @@ terms.appendChild(d);
 left.appendChild(terms);
 var adjPct = Math.expm1(r.categoryAdj) * 100;
 left.appendChild(el('p', null, 'log(market cap / TVL) = ' + R.model.value.intercept.toFixed(3) + ' ' + (R.model.value.slope < 0 ? '−' : '+') + ' ' + Math.abs(R.model.value.slope).toFixed(3) + '·ln(TVL) + category (' + (adjPct >= 0 ? '+' : '') + adjPct.toFixed(1) + '%). At $100M the size curve gives ' + multi(R.model.value.multipleAt100m) + '; here the full model gives ' + multi(multiple) + '. Held out: ' + R.model.value.loo.toFixed(2) + '× leave-one-out, ' + R.model.value.wf.toFixed(2) + '× walk-forward.'));
+left.appendChild(el('p', 'muted', 'Growth and age were tested for the value and dropped (see the term table); they price the token odds, not the launch value.'));
 var oddsBox = el('div', 'sandbox');
 var oddsHead = el('div', 'sbHead');
 oddsHead.appendChild(el('h4', null, 'Token odds'));
@@ -540,9 +541,9 @@ var shr = el('tr');
 sh.appendChild(shr);
 share.appendChild(sh);
 var sb = el('tbody');
-[1000, 10000, 50000].forEach(function (pos) {
+[...new Set([1000, 10000, 50000, Math.round(r.plan.capital)])].forEach(function (pos) {
 var s = farm(r, pos);
-var tr = el('tr', pos === R.model.planSize ? 'current' : '');
+var tr = el('tr', pos === Math.round(r.plan.capital) ? 'current' : '');
 tr.appendChild(el('td', null, '$' + pos.toLocaleString('en-US')));
 tr.appendChild(el('td', 'num', money(s.drop)));
 tr.appendChild(el('td', 'num', '$' + s.fees.toFixed(2)));
@@ -553,7 +554,7 @@ sb.appendChild(tr);
 });
 share.appendChild(sb);
 right.appendChild(share);
-right.appendChild(el('p', 'muted', 'Drop = implied × 7% × position/TVL; T-bill is the same money at 4% for 12 weeks. The plan below is written for $10,000.'));
+right.appendChild(el('p', 'muted', 'Drop = implied × 7% × position/TVL; T-bill is the same money at 4% for 12 weeks. The plan below is written for $' + r.plan.capital.toLocaleString('en-US') + '.'));
 var plan = el('table', 'mini planTable');
 var thead = el('thead');
 var hr = el('tr');
