@@ -31,9 +31,9 @@
     if (attrs) for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, attrs[k]);
     return n;
   }
-  function svgText(x, y, text, cls) {
+  function svgText(x, y, text, anchor) {
     var t = svgEl('text', { x: x, y: y, 'font-size': '10', fill: '#66738c', 'font-family': 'ui-monospace,monospace' });
-    if (cls) t.setAttribute('class', cls);
+    if (anchor) t.setAttribute('text-anchor', anchor);
     t.textContent = text;
     return t;
   }
@@ -603,7 +603,7 @@
     for (var e = lo; e <= hi; e++) {
       root.appendChild(svgEl('line', { x1: sx(e), y1: sy(lo), x2: sx(e), y2: sy(hi), stroke: '#182338', 'stroke-width': '1' }));
       root.appendChild(svgEl('line', { x1: sx(lo), y1: sy(e), x2: sx(hi), y2: sy(e), stroke: '#182338', 'stroke-width': '1' }));
-      root.appendChild(svgText(sx(e), H - B + 16, money(Math.pow(10, e)), 'mid'));
+      root.appendChild(svgText(sx(e), H - B + 16, money(Math.pow(10, e)), e === hi ? 'end' : e === lo ? 'start' : 'mid'));
       root.appendChild(svgText(L - 8, sy(e) + 3, money(Math.pow(10, e)), 'end'));
     }
     root.appendChild(svgEl('line', { x1: sx(lo), y1: sy(lo), x2: sx(hi), y2: sy(hi), stroke: '#f5b33c', 'stroke-width': '1.4', 'stroke-dasharray': '5 5', opacity: '0.85' }));
