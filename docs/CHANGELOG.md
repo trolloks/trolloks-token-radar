@@ -211,6 +211,11 @@ Codex reviewed the v9 category effect and sandbox:
 - Gate: dashboard source 65,534 / 65,536; dossier 1,406,952; four 1280x1024 screenshots.
 - Scheduled at 2026-11-24T00:00:30Z; v8b and v9b remain fallbacks. The scheduler also
   polls the score and pins v9c only if it beats v5 (942,846); otherwise v5 stays.
+- Pre-submission audit, 2026-11-23: the entry code reads `MAKEFUN_OUTPUT_DIR` only as an
+  output path, so it meets the new rule against running code from an environment secret;
+  the bundle manifest names commit `4c46abf`, dirty false, and that commit is on
+  `origin/v9-category`. The dashboard source is 65,534 of 65,536 bytes; the dossier text
+  hits its 65,536-byte cap and leaves 390 bytes (15 lines) of `index.html` out.
 
 ## Odds prior test, 2026-11-23 — not adopted
 
