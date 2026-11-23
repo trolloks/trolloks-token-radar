@@ -165,11 +165,8 @@ snapshot carries no pool or route data.
 
 - Commit `4615746`, bundle `radar-v8b.tar.gz`, transcript check passes (83.6% authored).
 - Gate: dashboard source 65,2xx / 65,536; dossier 1,397,102; four 1280x1024 screenshots.
-- Not submitted: today's quota is spent. Submit after 2026-11-24T00:00:00Z and keep v5
-  pinned until v8b is measured.
-- Scheduled: `/tmp/opencode/submit-v8b.sh` wakes at 2026-11-24T00:00:30Z, checks
-  `can_submit`, then submits commit `4615746` with the checked bundle. v5 stays the final
-  pick until v8b is scored and compared.
+- Superseded as the scheduled submission by v9, which is a strict superset: same board
+  and fixes plus the category-effect model. v8b remains the fallback bundle.
 
 ## Model test, 2026-11-23 — shrunk category effect
 
@@ -191,5 +188,6 @@ within noise. Keep as the v9 candidate if the final heat needs another entry.
   detail page shows the adjustment and the sandbox reprices with it.
 - Gate: dashboard source 65,500 / 65,536; dossier 1,410,397; four 1280x1024 screenshots;
   verify.mjs all pass. Bundle `radar-v9.tar.gz` checked (84.1% authored, 285 turns).
-- Commit `4689a8f` on `v9-category`; not submitted. v8b is scheduled for 00:00:30Z; v9 is
-  the next candidate once v8b is measured.
+- Commit `4689a8f` on `v9-category`. Scheduled to submit at 2026-11-24T00:00:30Z via
+  `/tmp/opencode/submit-v9.sh`; v8b stays as the fallback bundle. v5 remains the final
+  pick until v9 is scored.
