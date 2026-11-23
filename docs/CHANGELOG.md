@@ -167,3 +167,6 @@ snapshot carries no pool or route data.
 - Gate: dashboard source 65,2xx / 65,536; dossier 1,397,102; four 1280x1024 screenshots.
 - Not submitted: today's quota is spent. Submit after 2026-11-24T00:00:00Z and keep v5
   pinned until v8b is measured.
+- Scheduled: `/tmp/opencode/submit-v8b.sh` wakes at 2026-11-24T00:00:30Z, checks
+  `can_submit`, then submits commit `4615746` with the checked bundle. v5 stays the final
+  pick until v8b is scored and compared.
