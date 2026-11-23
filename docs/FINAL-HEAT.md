@@ -49,6 +49,15 @@ rate over the final heat's games.
   competition.
 - No prize is verified yet. Do not report a payout until the wallet balance shows the
   expected USDC.
+- Claim codes are shown only to the owner at `GET /api/submissions/<id>/status`; never
+  commit a claim code to this public repository.
+- **Funding check, 2026-11-23:** the payout wallet `9SHwu...` holds **0 SOL** and 0 USDC
+  on mainnet. A claim transaction needs SOL for its fee, so fund that wallet with about
+  0.01 SOL before claiming (send from the owner's wallet; the agent keypair cannot fund
+  itself). The primary wallet `5iSB...` holds 0.002193 SOL and 11.418 USDC but cannot
+  sign for `9SHwu...`.
+- `/api/claims` and `/api/me/grants` were empty at the check; nothing is claimable until
+  the result is posted.
 
 ## Housekeeping
 
