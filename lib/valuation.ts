@@ -59,6 +59,12 @@ export interface ModelCheck {
   within2x: number;
   buckets: CalibrationBucket[];
   categories: CategoryCheck[];
+  walkForward: {
+    n: number;
+    medianFactor: number;
+    spearman: number;
+    coverage: number;
+  };
 }
 
 export interface Row {
@@ -97,6 +103,7 @@ export interface Row {
     gas: number;
     hours: number;
     weeks: number;
+    gasPerHour: number;
     verdict: string;
   };
   note: string;
@@ -133,9 +140,13 @@ export interface Radar {
     protocols: number;
     preToken: number;
     watchlist: number;
+    watchlistCovered: number;
     candidates: number;
     live: number;
     unpriced: number;
+    excludedBridge: number;
+    excludedCex: number;
+    excludedProduct: number;
   };
   rows: Row[];
   live: LivePeer[];
@@ -326,6 +337,26 @@ const crossValidate = (live: Protocol[]): ModelCheck => {
       medianFactor: round(median(list.map((r) => r.factor)), 3),
     }))
     .sort((a, b) => b.n - a.n);
+  // Walk-forward: fit the older 70% of dated live tokens, price the newer 30% it never saw.
+  const dated = live.filter((p) => ageDays(p, AS_OF_CACHE) !== null).sort((a, b) => (ageDays(b, AS_OF_CACHE) ?? 0) - (ageDays(a, AS_OF_CACHE) ?? 0));
+  const cut = Math.floor(dated.length * 0.7);
+  const earlier = dated.slice(0, cut);
+  const later = dated.slice(cut);
+  const forwardModel = earlier.length > 0 ? fitModel(earlier) : null;
+  const forward = later
+    .map((p) => {
+      const predicted = forwardModel!.predict(p);
+      return predicted > 0 && p.mcap! > 0 ? { predicted, actual: p.mcap!, d: Math.log(p.mcap! / predicted), factor: Math.max(predicted / p.mcap!, p.mcap! / predicted) } : null;
+    })
+    .filter((x): x is { predicted: number; actual: number; d: number; factor: number } => x !== null);
+  const forwardBand = bucketBand(buckets, 'medium');
+  const walkForward = {
+    n: forward.length,
+    medianFactor: forward.length ? round(median(forward.map((r) => r.factor)), 3) : 0,
+    spearman: forward.length ? round(spearman(forward.map((r) => r.predicted), forward.map((r) => r.actual)), 3) : 0,
+    coverage: forward.length ? round(forward.filter((r) => r.d >= Math.log(forwardBand.low) && r.d <= Math.log(forwardBand.high)).length / forward.length, 4) : 0,
+  };
+
   return {
     folds: FOLDS,
     n: residuals.length,
@@ -334,27 +365,28 @@ const crossValidate = (live: Protocol[]): ModelCheck => {
     within2x: round(residuals.filter((r) => r.factor <= 2).length / Math.max(1, residuals.length), 4),
     buckets,
     categories,
+    walkForward,
   };
 };
 
-const bucketBand = (check: ModelCheck, bucket: 'high' | 'medium' | 'low') => {
-  const found = check.buckets.find((b) => b.bucket === bucket);
+const bucketBand = (buckets: CalibrationBucket[], bucket: 'high' | 'medium' | 'low') => {
+  const found = buckets.find((b) => b.bucket === bucket);
   return found ?? { low: 0.08, high: 14, coverage: 0.8 };
 };
 
 const CATEGORY_ACTION: [RegExp, string][] = [
-  [/lend|cdp|borrow|collateral|stable/i, 'Supply a blue-chip asset and borrow a stable against it at 50% LTV or less'],
-  [/dex|amm|swap/i, 'Provide liquidity in the deepest pool and stake the LP receipt if the protocol allows'],
-  [/liquid staking|staking|restak/i, 'Stake the native asset and hold the receipt token through the farm window'],
-  [/bridge|canonical|cross chain/i, 'Bridge a small amount each way so the address registers real usage'],
-  [/yield|aggregator|vault|farm/i, 'Deposit into the flagship vault, not the highest advertised APY'],
-  [/rwa|real/i, 'Complete the allow-list check and mint the smallest permitted position'],
-  [/deriv|perp|option|basis/i, 'Open and close a small hedged position at 2x leverage or less'],
-  [/curator|allocator/i, 'Deposit into the curator vault with the longest track record and a published fee'],
-  [/predict|gaming|nft|social/i, 'Take one real position in a liquid market, not a wash trade'],
-  [/insur|cover/i, 'Buy the smallest cover the protocol sells and hold it through the window'],
+  [/lend|cdp|borrow|collateral|stable/i, 'Supply USDC (or the chain native stable) and borrow USDT against it at 50% LTV or less'],
+  [/dex|amm|swap/i, 'Provide liquidity in the deepest USDC pair and stake the LP receipt if the protocol allows'],
+  [/liquid staking|staking|restak/i, 'Stake the chain native asset (ETH, SOL or the listed asset) and hold the receipt token'],
+  [/bridge|canonical|cross chain/i, 'Bridge USDC in, do one swap, then bridge the remainder back so both directions register'],
+  [/yield|aggregator|vault|farm/i, 'Deposit USDC into the flagship vault, not the highest advertised APY, and read the fee'],
+  [/rwa|real/i, 'Complete the allow-list check and mint the smallest permitted USDC position'],
+  [/deriv|perp|option|basis/i, 'Open and close a small hedged BTC or ETH position at 2x leverage or less'],
+  [/curator|allocator/i, 'Deposit USDC into the curator vault with the longest track record and a published fee'],
+  [/predict|gaming|nft|social/i, 'Take one real position in a liquid market with USDC, not a wash trade'],
+  [/insur|cover/i, 'Buy the smallest USDC-denominated cover the protocol sells and hold it through the window'],
 ];
-const GENERIC_ACTION = 'Make one genuine deposit or swap so the address has real usage';
+const GENERIC_ACTION = 'Make one genuine USDC deposit or swap so the address has real usage';
 
 const actionFor = (p: Protocol): string => {
   const hit = CATEGORY_ACTION.find(([re]) => re.test(p.category ?? ''));
@@ -389,8 +421,10 @@ const farmPlan = (
   const name = clean(p.name, 50);
   const weekly = Math.max(0.5, gas / 4);
   const exit = Math.max(1, gas / 2);
-  const hours = round(0.75 + weeks * 0.25, 1);
-  const totalGas = round(gas + weekly * weeks + exit, 2);
+  // Every figure below is the sum of the steps that show it, so the summary and the table agree.
+  const totalGas = round(gas * 2 + weekly * weeks + exit, 2);
+  const hours = round((20 + 10 + 15 + weeks * 15 + 10 + 30) / 60, 1);
+  const gasPerHour = round(totalGas / Math.max(0.1, hours), 2);
   const action = actionFor(p);
   const verdict = !candidate
     ? `Skip as a launch farm: ${whyNot ?? 'not a launch candidate'}.`
@@ -407,16 +441,16 @@ const farmPlan = (
     },
     { action: `Open ${name} from its official docs on ${chain}, confirm the contract address, and connect the fresh wallet.`, cost: `~$${gas} gas`, time: '10 min' },
     { action: `${action} with $${capital}; read the fee and withdrawal terms before signing.`, cost: `~$${gas} gas + protocol fee`, time: '15 min' },
-    { action: `Do one qualifying action a week for ${weeks} weeks - deposit, borrow, swap or vote - and never wash-trade volume.`, cost: `~$${weekly} gas/week`, time: `${weeks * 15} min total` },
-    { action: `Record wallet, tx hashes, dates and the protocol's TVL in a sheet; re-check only the protocol's own eligibility page.`, cost: '$0', time: '10 min/month' },
-    { action: `Hold through ${weeks} weekly snapshots; withdrawing early resets the activity history you are paying gas to build.`, cost: 'capital stays deployed', time: `${weeks} weeks` },
+    { action: `Do one qualifying action a week for ${weeks} weeks - deposit, borrow, swap or vote - and keep leverage low; never wash-trade volume.`, cost: `~$${weekly} gas/week`, time: `${weeks * 15} min total` },
+    { action: `Record wallet, tx hashes, dates and the protocol's TVL in a sheet; re-check eligibility only on the protocol's own site.`, cost: '$0', time: '10 min/month' },
+    { action: `Hold the position for ${weeks} weeks so the address has a sustained record; read the protocol's own docs for what it counts as usage.`, cost: 'capital stays deployed', time: `${weeks} weeks` },
     { action: `Exit by withdrawing, repaying any loan and bridging back; keep the wallet for future claims and never sign a DM link.`, cost: `~$${exit} gas`, time: '30 min' },
   ];
   for (const step of steps) {
     if (step.action.length < 20) step.action = `${step.action} (confirm the terms first).`;
     if (step.action.length > 600) step.action = `${step.action.slice(0, 590)}...`;
   }
-  return { steps, capital, gas: totalGas, hours, weeks, verdict };
+  return { steps, capital, gas: totalGas, hours, weeks, gasPerHour, verdict };
 };
 
 const CATEGORY_DD: [RegExp, string[]][] = [
@@ -459,7 +493,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     const peers = model.peers(p);
     const age = ageDays(p, snapshot.asOf);
     const confidence = bucketOf(peers, age);
-    const band = bucketBand(check, confidence);
+    const band = bucketBand(check.buckets, confidence);
     const widen = (age === null ? 1.3 : 1) * (peers < 3 ? 1.2 : 1);
     const implied = Math.max(1, Math.round(predicted));
     const whyNot = exclusion(p);
@@ -534,6 +568,14 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     }))
     .sort((a, b) => b.mcap - a.mcap);
 
+  const kindOf = (r: Row): 'cex' | 'bridge' | 'product' => {
+    const category = r.category ?? '';
+    if (category === 'CEX' || EXCHANGE_PREFIX.test(r.name)) return 'cex';
+    if (category === 'Bridge' || category === 'Canonical Bridge') return 'bridge';
+    return 'product';
+  };
+  const excluded = rows.filter((r) => !r.candidate);
+
   return {
     asOf: snapshot.asOf,
     source: snapshot.source,
@@ -554,9 +596,13 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
       protocols: snapshot.protocols.length,
       preToken: pre.length,
       watchlist: snapshot.watchlist.length,
+      watchlistCovered: rows.filter((r) => r.watch).length,
       candidates: rows.filter((r) => r.candidate).length,
       live: live.length,
       unpriced: snapshot.protocols.length - pre.length - live.length,
+      excludedBridge: excluded.filter((r) => kindOf(r) === 'bridge').length,
+      excludedCex: excluded.filter((r) => kindOf(r) === 'cex').length,
+      excludedProduct: excluded.filter((r) => kindOf(r) === 'product').length,
     },
     rows,
     live: livePeers,

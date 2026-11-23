@@ -127,7 +127,7 @@ for (const [i, row] of board.entries()) {
 }
 if (board.length < 100 || board.length > 4000) throw new Error(`invariant: board has ${board.length} rows`);
 if (board.length > 1 && board[0]!.implied_value_usd === board[board.length - 1]!.implied_value_usd) throw new Error('invariant: flat board');
-const missing = [...watch].filter((slug) => radar.rows.some((r) => r.slug === slug) && !slugs.has(slug));
+const missing = [...watch].filter((slug) => !slugs.has(slug));
 if (missing.length > 0) throw new Error(`invariant: watchlist missing ${missing.join(',')}`);
 
 mkdirSync(out, { recursive: true });

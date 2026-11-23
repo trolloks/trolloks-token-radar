@@ -27,6 +27,7 @@
   <a href="#/board" data-tab="board">Radar board</a>
   <a href="#/live" data-tab="live">Live token peers</a>
   <a href="#/method" data-tab="method">Method &amp; backtest</a>
+  <a href="#/compare" data-tab="compare">Shortlist <span id="pinNav" class="pill">0</span></a>
 </nav>
 
 <main id="main" tabindex="-1">
@@ -46,8 +47,11 @@
       <label><span>Scope</span><select id="scope">
         <option value="candidates">Launch candidates</option>
         <option value="watch">Watchlist only</option>
+        <option value="pinned">Shortlist only</option>
         <option value="all">All pre-token records</option>
       </select></label>
+      <button type="button" id="csv" class="ghost">Export CSV</button>
+      <button type="button" id="compareBtn" class="ghost">Compare shortlist</button>
       <button type="button" id="reset" class="ghost">Reset</button>
     </div>
     <div class="toolbar sub">
@@ -61,10 +65,12 @@
       <table id="table">
         <thead>
           <tr>
+            <th class="starcol" title="Shortlist">&#9734;</th>
             <th class="num" data-sort="rank">#</th>
             <th data-sort="name">Protocol</th>
             <th class="num" data-sort="tvl">TVL</th>
             <th class="num" data-sort="ch7">7d</th>
+            <th class="num" data-sort="age">No token</th>
             <th class="num" data-sort="implied">Implied value <small>if launched</small></th>
             <th class="bandcol">80% band</th>
             <th class="num" data-sort="multiple">× TVL</th>
@@ -137,6 +143,12 @@
         <p class="muted source" id="provenance"></p>
       </article>
     </div>
+  </section>
+
+  <section id="compareView" hidden>
+    <a class="back" href="#/board">← Back to the radar board</a>
+    <div class="sectionHead"><h2>Shortlist compare</h2><p>Star rows on the board to line them up here. Same model, same snapshot, side by side.</p></div>
+    <div id="compareBody"></div>
   </section>
 
   <section id="detailView" hidden></section>

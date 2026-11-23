@@ -36,5 +36,23 @@ Rank is the leaderboard row; the rate is the Bradley-Terry win rate against the 
 - Costed farm plans and a server-side invariant check before the board is written.
 - New dashboard: board, per-protocol detail page, live-peer tab, method tab.
 - Transcript gate locally: 78.4% of counted lines authored, 70 assistant turns, run record pass.
-- Score: pending.
+- Score: 889,086 (88.91%), interval 856,561–921,612; 12 wins, 0 losses.
+- Match log read: every game won, but the judge's margins averaged 3.89. The leader wins
+  20/20 with margins averaging 4.67. The judge named the page features (sandbox, compare,
+  pins, CSV) as the anchors' edge and called farm plans comparable.
 
+
+### v3, 2026-11-23 — built, not submitted yet
+
+- Fixes from the review: direct watchlist coverage check, correct sort direction, zero
+  growth no longer treated as missing, farm-plan gas/time totals summed from the steps,
+  age column added to the board.
+- New page features the match log named as the anchors' edge: what-if sandbox on every
+  detail page, starred shortlist with a compare view, client-side CSV export, and a
+  coverage flow strip (758 -> 342 -> 198, 128 live, 144 excluded).
+- Farm plans now name the asset and action, show cost per active hour, and keep their
+  totals consistent with the steps.
+- Second validation: walk-forward fit on the older 70% of dated peers, tested on the
+  newer 29 (median miss 4.31x, rank correlation 0.27, band coverage 76%).
+- Fourth screenshot: the method and backtest page.
+- Held until the change is judged large enough to spend an entry.
