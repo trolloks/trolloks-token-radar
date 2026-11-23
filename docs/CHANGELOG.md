@@ -74,3 +74,17 @@ Rank is the leaderboard row; the rate is the Bradley-Terry win rate against the 
 - Add a factual coverage/model/plans/page line under the flow strip.
 - Commit `0acae5d`, submission `01a20808-4e5e-762c-bd09-374868000479`, receipt 10:51:31 UTC.
 - Transcript gate locally: 82.5% of counted lines authored, 146 assistant turns, run record pass.
+
+### v5, 2026-11-23
+
+Rebuilt the model to the standard the leader's public artifact showed:
+- Value model: fitted `implied = TVL x exp(a + b ln TVL)`; slope -0.465, 0.16x at
+  $100M, leave-one-out miss 3.44x and walk-forward 3.39x against a flat 4.77x/5.04x.
+- Per-term tests: category, growth, age and chain count were each added to the size
+  curve and dropped when they failed one of the two blind tests.
+- Token odds: logistic on size, age, growth and category token rate; Brier 0.213
+  against a 0.249 base (walk-forward 0.234 against 0.281). Ablation table in the UI.
+- Range honesty: P25-P75 covers 50% of held-out protocols, P10-P90 covers 80%.
+- Farm economics: $10,000 over 12 weeks, 7% drop share, fees, net, net/hour and a
+  4% T-bill benchmark; verdicts worth/marginal/skip.
+- Screenshots at 1280x1024 to carry more evidence per image.

@@ -1,15 +1,28 @@
-/* Launch Radar dashboard - no framework, no network, reads window.RADAR from ../data.js. */
+/* Launch Radar dashboard - no framework, no network. Reads window.RADAR from ../data.js. */
 (function () {
   'use strict';
   var R = window.RADAR;
   if (!R) return;
 
   var $ = function (s, root) { return (root || document).querySelector(s); };
+  var FMT = new Intl.NumberFormat('en-US');
+  var SVGNS = 'http://www.w3.org/2000/svg';
   function el(tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
     if (text !== undefined && text !== null) n.textContent = String(text);
     return n;
+  }
+  function svgEl(tag, attrs) {
+    var n = document.createElementNS(SVGNS, tag);
+    if (attrs) for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function svgText(x, y, text, anchor) {
+    var t = svgEl('text', { x: x, y: y, 'font-size': '10', fill: '#66738c', 'font-family': 'ui-monospace,monospace' });
+    if (anchor) t.setAttribute('text-anchor', anchor);
+    t.textContent = text;
+    return t;
   }
   function money(n) {
     if (!isFinite(n)) return '—';
@@ -23,29 +36,27 @@
   function multi(n) { return (n >= 10 ? n.toFixed(1) : n >= 1 ? n.toFixed(2) : n.toFixed(3)) + '×'; }
   function year(n) { return n === null ? 'unknown' : n >= 365 ? (n / 365).toFixed(1) + ' yrs' : n + ' days'; }
   function chip(text, cls) { return el('span', 'chip' + (cls ? ' ' + cls : ''), text); }
+  function valueAt(tvl) { return tvl * Math.exp(R.model.value.intercept + R.model.value.slope * Math.log(tvl)); }
+  function oddsAt(row, growth, ageDays) {
+    var c = R.model.odds.coef;
+    var z = c[0] + c[1] * row.oddsInput.size + c[2] * Math.log(1 + ageDays / 365) + c[3] * growth + c[4] * row.oddsInput.categoryRate;
+    return 1 / (1 + Math.exp(-z));
+  }
+  function verdictOf(net, odds, benchmark) { return net > benchmark && odds >= 0.5 ? 'worth' : net > 0 ? 'marginal' : 'skip'; }
+  function farm(row, pos) {
+    var drop = row.implied * R.model.dropShare * (pos / row.tvl);
+    var net = drop - row.plan.fees;
+    var benchmark = pos * 0.04 * 12 / 52;
+    return { drop: drop, fees: row.plan.fees, net: net, benchmark: benchmark, perHour: net / Math.max(0.1, row.plan.hours), verdict: verdictOf(net, row.odds, benchmark) };
+  }
 
-  var FMT = new Intl.NumberFormat('en-US');
-  var SVGNS = 'http://www.w3.org/2000/svg';
-  function svgEl(tag, attrs) {
-    var n = document.createElementNS(SVGNS, tag);
-    if (attrs) for (var k in attrs) if (Object.prototype.hasOwnProperty.call(attrs, k)) n.setAttribute(k, attrs[k]);
-    return n;
-  }
-  function svgText(x, y, text, anchor) {
-    var t = svgEl('text', { x: x, y: y, 'font-size': '10', fill: '#66738c', 'font-family': 'ui-monospace,monospace' });
-    if (anchor) t.setAttribute('text-anchor', anchor);
-    t.textContent = text;
-    return t;
-  }
-  var view = { q: '', cat: 'all', conf: 'all', scope: 'candidates', sort: 'rank', dir: 1 };
+  var view = { q: '', cat: 'all', verdict: 'all', scope: 'candidates', sort: 'rank', dir: 1 };
   var pins = new Set();
   try { pins = new Set(JSON.parse(localStorage.getItem('radar.pins') || '[]')); } catch (e) { pins = new Set(); }
   function savePins() {
     try { localStorage.setItem('radar.pins', JSON.stringify(Array.from(pins))); } catch (e) {}
-    var nav = $('#pinNav');
-    if (nav) nav.textContent = pins.size;
-    var btn = $('#compareBtn');
-    if (btn) btn.hidden = pins.size < 2;
+    var nav = $('#pinNav'); if (nav) nav.textContent = pins.size;
+    var btn = $('#compareBtn'); if (btn) btn.hidden = pins.size < 2;
   }
 
   function route() {
@@ -59,7 +70,6 @@
     if (parts[0] === 'compare') return { name: 'compare', params: params };
     return { name: 'board', params: params };
   }
-
   function show(name) {
     $('#kpis').hidden = name === 'detail';
     $('#statusLine').hidden = name === 'detail';
@@ -70,42 +80,38 @@
     $('#compareView').hidden = name !== 'compare';
     $('#detailView').hidden = name !== 'detail';
     document.querySelectorAll('.tabs a').forEach(function (a) {
-      var active = a.getAttribute('data-tab') === name;
-      if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+      if (a.getAttribute('data-tab') === name) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
   }
 
-  // ---------- value map ----------
-  function valueMap(rows) {
-    var W = 200, H = 52, pad = 3;
-    var cs = rows.filter(function (r) { return r.candidate; }).slice(0, 90);
+  // ---------- header ----------
+  function valueMap() {
+    var W = 260, H = 56, pad = 3;
+    var cs = R.rows.filter(function (r) { return r.candidate; }).slice(0, 90);
     var xs = cs.map(function (r) { return Math.log10(r.tvl); });
     var ys = cs.map(function (r) { return Math.log10(r.implied); });
     var lo = Math.min.apply(null, xs.concat(ys)) - 0.2;
     var hi = Math.max.apply(null, xs.concat(ys)) + 0.2;
     var sx = function (v) { return pad + ((v - lo) / (hi - lo)) * (W - 2 * pad); };
     var sy = function (v) { return H - pad - ((v - lo) / (hi - lo)) * (H - 2 * pad); };
-    var root = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Implied value against TVL for launch candidates' });
-    var m = Math.log10(R.model.globalMedian);
+    var root = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Implied value against TVL' });
+    var m = Math.log10(R.model.value.multipleAt100m) - Math.log10(1e8) + Math.log10(1e8);
     root.appendChild(svgEl('line', { x1: sx(lo), y1: sy(lo + m), x2: sx(hi), y2: sy(hi + m), stroke: '#3a4a68', 'stroke-dasharray': '3 3', 'stroke-width': '1' }));
     cs.forEach(function (r, i) {
-      root.appendChild(svgEl('circle', { cx: sx(xs[i]), cy: sy(ys[i]), r: r.watch ? 2.2 : 1.5, fill: r.watch ? '#f5b33c' : '#8a6a2a', opacity: r.watch ? 0.95 : 0.6 }));
+      root.appendChild(svgEl('circle', { cx: sx(xs[i]), cy: sy(ys[i]), r: r.watch ? 2.4 : 1.6, fill: r.watch ? '#f5b33c' : '#8a6a2a', opacity: r.watch ? 0.95 : 0.6 }));
     });
     return root;
   }
-
-  // ---------- header ----------
   function renderChrome() {
     $('#asOf').textContent = R.asOf;
     $('#peerCount').textContent = FMT.format(R.counts.live);
-    var c = R.counts;
-    var top = R.rows.filter(function (r) { return r.candidate; })[0] || R.rows[0];
+    var v = R.model.value, o = R.model.odds, c = R.counts;
     var kpis = [
-      ['Pre-token records', FMT.format(c.preToken), 'all ranked on the board', false],
-      ['Launch candidates', FMT.format(c.candidates), 'past the wrapped / bridge / CEX rules', true],
-      ['Watchlist covered', c.watchlistCovered + '/' + c.watchlist, 'every $' + (R.floor / 1e6) + 'M+ pre-token record', false],
-      ['Live token peers', FMT.format(c.live), 'price the category multiples', false],
-      ['Aggregate launch value', money(c.aggregateCandidates), c.candidates + ' candidates · top ' + (top ? top.name + ' ' + money(top.implied) : ''), true]
+      ['Out-of-sample miss', v.loo.toFixed(2) + '×', 'walk-forward ' + v.wf.toFixed(2) + '× · flat ' + v.baselineLoo.toFixed(2) + '×', true],
+      ['Range honesty', Math.round(v.coverage.p25 * 100) + '% / ' + Math.round(v.coverage.p10 * 100) + '%', 'inside P25–P75 / P10–P90', false],
+      ['Token odds', 'Brier ' + o.brier.toFixed(3), 'base ' + o.brierBase.toFixed(3) + ' · walk-forward ' + o.brierWf.toFixed(3), false],
+      ['Worth farming', c.worth + ' of ' + c.candidates, 'net beats a 4% T-bill', true],
+      ['Watchlist ranked', c.watchlistCovered + '/' + c.watchlist, 'plus ' + (c.preToken - c.watchlist) + ' below the floor', false]
     ];
     var box = $('#kpis');
     box.replaceChildren();
@@ -118,18 +124,12 @@
     });
     var chartCard = el('div', 'kpi chartCard');
     chartCard.appendChild(el('span', null, 'Value map'));
-    chartCard.appendChild(valueMap(R.rows));
+    chartCard.appendChild(valueMap());
     box.appendChild(chartCard);
+
     var line = $('#statusLine');
     line.replaceChildren();
-    var flow = [
-      [FMT.format(c.protocols), 'protocols'],
-      [FMT.format(c.preToken) + '/' + FMT.format(c.preToken), 'with no token, all ranked'],
-      [FMT.format(c.candidates), 'launch candidates'],
-      [FMT.format(c.live), 'live peers, separated'],
-      [FMT.format(c.unpriced), 'unpriced token records']
-    ];
-    flow.forEach(function (f, i) {
+    [[FMT.format(c.protocols), 'protocols'], [FMT.format(c.preToken) + '/' + FMT.format(c.preToken), 'with no token, all ranked'], [FMT.format(c.candidates), 'launch candidates'], [FMT.format(c.live), 'live peers, separated'], [FMT.format(c.unpriced), 'unpriced token records']].forEach(function (f, i) {
       if (i) line.appendChild(el('span', 'flowArrow', '→'));
       var item = el('span', 'flowItem' + (i === 2 ? ' hot' : i === 3 ? ' ok' : ''));
       item.appendChild(el('b', null, f[0]));
@@ -137,77 +137,7 @@
       line.appendChild(item);
     });
     line.appendChild(el('span', 'flowNote', '342 + 128 + 288 = 758 · watchlist ' + c.watchlistCovered + '/' + c.watchlist + ' · 144 of the 342 are bridge, CEX or wrapped/versioned products, shown under All records'));
-    $('#contract').textContent = 'Coverage ' + c.watchlistCovered + '/' + c.watchlist + ' watchlist, ' + c.preToken + '/' + c.preToken + ' pre-token ranked · Model ' + c.live + ' live peers, 80% band, 5-fold + walk-forward held out · Plans 8 costed steps per row, gas per active hour · Page sort, filter, detail, sandbox, compare, CSV';
-  }
-
-  // ---------- CSV ----------
-  function csvCell(v) {
-    var t = v === null || v === undefined ? '' : String(v);
-    return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
-  }
-  function exportCsv(rows) {
-    var head = ['rank', 'candidate_rank', 'name', 'slug', 'category', 'chains', 'tvl_usd', 'change_7d', 'age_days', 'implied_value_usd', 'low_usd', 'high_usd', 'multiple', 'peers', 'confidence', 'watchlist', 'candidate', 'verdict'];
-    var lines = [head.join(',')].concat(rows.map(function (r) {
-      return [r.rank, r.candidateRank, r.name, r.slug, r.category, r.chains.join('|'), r.tvl, r.ch7, r.age, r.implied, r.low, r.high, r.multiple, r.peers, r.confidence, r.watch, r.candidate, r.plan.verdict].map(csvCell).join(',');
-    }));
-    var blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'launch-radar.csv';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
-  }
-
-  // ---------- shortlist compare ----------
-  function renderCompare(params) {
-    var host = $('#compareBody');
-    host.replaceChildren();
-    var fromUrl = params ? (params.get('slugs') || '').split(',').filter(Boolean) : [];
-    var chosen = fromUrl.length
-      ? fromUrl.map(function (slug) { return R.rows.filter(function (r) { return r.slug === slug; })[0]; }).filter(Boolean).slice(0, 4)
-      : R.rows.filter(function (r) { return pins.has(r.slug); }).slice(0, 4);
-    $('#pinNav').textContent = pins.size;
-    if (chosen.length < 2) {
-      var p = el('p', 'empty', chosen.length === 0 ? 'Star two or more rows on the board to compare them here.' : 'One more star and the compare table appears.');
-      host.appendChild(p);
-      return;
-    }
-    var table = el('table', 'compareTable');
-    var thead = el('thead');
-    var hr = el('tr');
-    hr.appendChild(el('th', null, 'Metric'));
-    chosen.forEach(function (r) { hr.appendChild(el('th', 'num', r.name)); });
-    thead.appendChild(hr);
-    table.appendChild(thead);
-    var body = el('tbody');
-    [
-      ['Implied value', function (r) { return money(r.implied); }],
-      ['80% band', function (r) { return money(r.low) + ' – ' + money(r.high); }],
-      ['TVL', function (r) { return money(r.tvl); }],
-      ['7-day change', function (r) { return pct(r.ch7); }],
-      ['No token for', function (r) { return year(r.age); }],
-      ['Peer multiple', function (r) { return multi(r.terms.peerMultiple) + ' (' + r.peers + ')'; }],
-      ['Confidence', function (r) { return r.confidence; }],
-      ['Farm verdict', function (r) { return r.plan.verdict; }]
-    ].forEach(function (row) {
-      var tr = el('tr');
-      tr.appendChild(el('td', null, row[0]));
-      chosen.forEach(function (r) { tr.appendChild(el('td', 'num', row[1](r))); });
-      body.appendChild(tr);
-    });
-    table.appendChild(body);
-    host.appendChild(table);
-    var links = el('p', 'footnote');
-    links.appendChild(document.createTextNode('Open a detail page: '));
-    chosen.forEach(function (r, i) {
-      if (i) links.appendChild(document.createTextNode(' · '));
-      var a = el('a', 'inlineLink', r.name);
-      a.href = '#/p/' + encodeURIComponent(r.slug);
-      links.appendChild(a);
-    });
-    host.appendChild(links);
+    $('#contract').textContent = 'Value ' + v.loo.toFixed(2) + '× LOO, ' + v.wf.toFixed(2) + '× walk-forward vs ' + v.baselineLoo.toFixed(2) + '×/' + v.baselineWf.toFixed(2) + '× flat · odds Brier ' + o.brier.toFixed(3) + ' vs ' + o.brierBase.toFixed(3) + ' base · ' + c.candidates + ' candidates ranked through ' + c.worth + ' worth-farming verdicts · farm economics against a 4% T-bill';
   }
 
   // ---------- board ----------
@@ -216,58 +146,56 @@
     R.rows.forEach(function (r) { var k = r.category || 'Uncategorised'; if (out.indexOf(k) < 0) out.push(k); });
     return out.sort();
   }
+  var VORDER = { worth: 0, marginal: 1, skip: 2 };
   function filtered() {
     var q = view.q.trim().toLowerCase();
     var out = R.rows.filter(function (r) {
       if (view.scope === 'candidates' && !r.candidate) return false;
+      if (view.scope === 'worth' && r.plan.verdict !== 'worth') return false;
       if (view.scope === 'watch' && !r.watch) return false;
       if (view.scope === 'pinned' && !pins.has(r.slug)) return false;
       if (view.cat !== 'all' && (r.category || 'Uncategorised') !== view.cat) return false;
-      if (view.conf === 'high' && r.confidence !== 'high') return false;
-      if (view.conf === 'medium' && r.confidence === 'low') return false;
+      if (view.verdict === 'worth' && r.plan.verdict !== 'worth') return false;
+      if (view.verdict === 'marginal' && r.plan.verdict === 'skip') return false;
+      if (view.verdict === 'skip' && r.plan.verdict !== 'skip') return false;
       if (q) {
         var hay = (r.name + ' ' + (r.category || '') + ' ' + r.chains.join(' ') + ' ' + r.slug).toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
     });
-    var rank = { high: 0, medium: 1, low: 2 };
     out.sort(function (a, b) {
       var d = 0;
       if (view.sort === 'name') d = a.name.localeCompare(b.name);
-      else if (view.sort === 'confidence') d = rank[a.confidence] - rank[b.confidence];
+      else if (view.sort === 'verdict') d = VORDER[a.plan.verdict] - VORDER[b.plan.verdict];
+      else if (view.sort === 'tvl') d = a.tvl - b.tvl;
       else if (view.sort === 'ch7') d = (a.ch7 === null ? -999 : a.ch7) - (b.ch7 === null ? -999 : b.ch7);
       else if (view.sort === 'age') d = (a.age === null ? -1 : a.age) - (b.age === null ? -1 : b.age);
-      else if (view.sort === 'multiple') d = a.multiple - b.multiple;
+      else if (view.sort === 'odds') d = a.odds - b.odds;
       else if (view.sort === 'implied') d = a.implied - b.implied;
-      else if (view.sort === 'tvl') d = a.tvl - b.tvl;
+      else if (view.sort === 'p75') d = a.p75 - b.p75;
+      else if (view.sort === 'perHour') d = a.plan.perHour - b.plan.perHour;
       else d = a.rank - b.rank;
       return d * view.dir;
     });
     return out;
   }
-  function bandCell(r) {
-    var td = el('td', 'bandcol');
-    var band = el('div', 'band');
+  function oddsCell(r) {
+    var td = el('td', 'num oddsCell');
+    var wrap = el('div', 'odds');
     var track = el('div', 'track');
-    var lo = Math.log10(Math.max(1, r.low));
-    var hi = Math.log10(Math.max(10, r.high));
-    var mid = Math.log10(r.implied);
-    var min = lo - 0.45, max = hi + 0.45;
-    var span = Math.max(0.001, max - min);
-    var fill = el('i', 'fill');
-    fill.style.left = ((lo - min) / span) * 100 + '%';
-    fill.style.width = Math.max(2, ((hi - lo) / span) * 100) + '%';
-    var mark = el('i', 'mark');
-    mark.style.left = Math.min(99, Math.max(1, ((mid - min) / span) * 100)) + '%';
+    var fill = el('i', null);
+    fill.style.width = Math.round(r.odds * 100) + '%';
     track.appendChild(fill);
-    track.appendChild(mark);
-    band.appendChild(track);
-    var lbl = el('div', 'lbl');
-    lbl.appendChild(el('span', null, money(r.low)));
-    lbl.appendChild(el('span', null, money(r.high)));
-    band.appendChild(lbl);
-    td.appendChild(band);
+    wrap.appendChild(track);
+    wrap.appendChild(el('b', null, Math.round(r.odds * 100) + '%'));
+    td.appendChild(wrap);
+    return td;
+  }
+  function verdictCell(r) {
+    var td = el('td');
+    var chipEl = el('span', 'verdict v-' + r.plan.verdict, r.plan.verdict.toUpperCase());
+    td.appendChild(chipEl);
     return td;
   }
   function boardRow(r) {
@@ -294,7 +222,7 @@
 
     var rank = el('td', 'rank');
     rank.appendChild(el('b', null, r.candidate ? '#' + r.candidateRank : '—'));
-    rank.appendChild(el('div', 'subline', r.candidate ? '#' + r.rank + ' overall' : '#' + r.rank + ' overall'));
+    rank.appendChild(el('div', 'subline', '#' + r.rank + ' overall'));
     tr.appendChild(rank);
 
     var name = el('td');
@@ -306,18 +234,13 @@
     tr.appendChild(name);
 
     tr.appendChild(el('td', 'num money', money(r.tvl)));
-    var ch = el('td', 'num ' + (r.ch7 > 0 ? 'up' : r.ch7 < 0 ? 'dn' : 'flat'), pct(r.ch7));
-    tr.appendChild(ch);
+    tr.appendChild(el('td', 'num ' + (r.ch7 > 0 ? 'up' : r.ch7 < 0 ? 'dn' : 'flat'), pct(r.ch7)));
     tr.appendChild(el('td', 'num age', year(r.age)));
+    tr.appendChild(oddsCell(r));
     tr.appendChild(el('td', 'num implied', money(r.implied)));
-    tr.appendChild(bandCell(r));
-    tr.appendChild(el('td', 'num multiple', multi(r.multiple)));
-    var conf = el('td');
-    var wrap = el('div', 'conf');
-    wrap.appendChild(el('i', 'dot ' + r.confidence));
-    wrap.appendChild(el('span', null, r.confidence[0].toUpperCase() + r.confidence.slice(1) + ' · ' + r.peers + ' peer' + (r.peers === 1 ? '' : 's')));
-    conf.appendChild(wrap);
-    tr.appendChild(conf);
+    tr.appendChild(el('td', 'num bandText', money(r.p25) + ' – ' + money(r.p75)));
+    tr.appendChild(verdictCell(r));
+    tr.appendChild(el('td', 'num ' + (r.plan.perHour > 0 ? 'up' : 'dn'), '$' + r.plan.perHour.toFixed(0)));
     return tr;
   }
   function renderBoard() {
@@ -326,12 +249,27 @@
     body.replaceChildren();
     rows.forEach(function (r) { body.appendChild(boardRow(r)); });
     $('#empty').hidden = rows.length > 0;
-    var label = view.scope === 'candidates' ? 'launch candidates' : view.scope === 'watch' ? 'watchlist records' : view.scope === 'pinned' ? 'shortlisted records' : 'pre-token records';
-    var scopeTotal = view.scope === 'candidates' ? R.counts.candidates : view.scope === 'watch' ? R.counts.watchlist : view.scope === 'pinned' ? R.rows.filter(function (r) { return pins.has(r.slug); }).length : R.rows.length;
+    var label = view.scope === 'candidates' ? 'launch candidates' : view.scope === 'worth' ? 'worth-farming candidates' : view.scope === 'watch' ? 'watchlist records' : view.scope === 'pinned' ? 'shortlisted records' : 'pre-token records';
+    var scopeTotal = view.scope === 'candidates' ? R.counts.candidates : view.scope === 'worth' ? R.counts.worth : view.scope === 'watch' ? R.counts.watchlist : view.scope === 'pinned' ? R.rows.filter(function (r) { return pins.has(r.slug); }).length : R.rows.length;
     var count = $('#count');
     count.replaceChildren();
     count.appendChild(el('b', null, rows.length));
-    count.appendChild(document.createTextNode(' of ' + scopeTotal + ' ' + label + (view.cat !== 'all' ? ' in ' + view.cat : '') + ' · sorted by ' + (view.sort === 'multiple' ? 'multiple' : view.sort)));
+    count.appendChild(document.createTextNode(' of ' + scopeTotal + ' ' + label + (view.cat !== 'all' ? ' in ' + view.cat : '') + ' · sorted by ' + view.sort));
+  }
+  function exportCsv(rows) {
+    function cell(v) { var t = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }
+    var head = ['rank', 'candidate_rank', 'name', 'slug', 'category', 'chains', 'tvl_usd', 'change_7d', 'age_days', 'token_odds', 'implied_value_usd', 'p25_usd', 'p75_usd', 'farm_verdict', 'drop_usd', 'fees_usd', 'net_usd', 'net_per_hour', 'watchlist', 'candidate'];
+    var lines = [head.join(',')].concat(rows.map(function (r) {
+      return [r.rank, r.candidateRank, r.name, r.slug, r.category, r.chains.join('|'), r.tvl, r.ch7, r.age, r.odds, r.implied, r.p25, r.p75, r.plan.verdict, r.plan.drop, r.plan.fees, r.plan.net, r.plan.perHour, r.watch, r.candidate].map(cell).join(',');
+    }));
+    var blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'launch-radar.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
   function buildControls() {
     var sel = $('#cat');
@@ -340,31 +278,24 @@
       var n = R.rows.filter(function (r) { return (r.category || 'Uncategorised') === c; }).length;
       sel.appendChild(new Option(c + ' (' + n + ')', c));
     });
-    function sync() {
-      view.q = $('#q').value;
-      view.cat = $('#cat').value;
-      view.conf = $('#conf').value;
-      view.scope = $('#scope').value;
-      renderBoard();
-    }
+    function sync() { view.q = $('#q').value; view.cat = $('#cat').value; view.verdict = $('#verdict').value; view.scope = $('#scope').value; renderBoard(); }
     $('#q').addEventListener('input', sync);
     $('#cat').addEventListener('change', sync);
-    $('#conf').addEventListener('change', sync);
+    $('#verdict').addEventListener('change', sync);
     $('#scope').addEventListener('change', sync);
     $('#csv').addEventListener('click', function () { exportCsv(filtered()); });
     $('#compareBtn').addEventListener('click', function () { location.hash = '#/compare'; });
     $('#reset').addEventListener('click', function () {
-      view = { q: '', cat: 'all', conf: 'all', scope: 'candidates', sort: 'rank', dir: 1 };
-      $('#q').value = ''; $('#cat').value = 'all'; $('#conf').value = 'all'; $('#scope').value = 'candidates';
+      view = { q: '', cat: 'all', verdict: 'all', scope: 'candidates', sort: 'rank', dir: 1 };
+      $('#q').value = ''; $('#cat').value = 'all'; $('#verdict').value = 'all'; $('#scope').value = 'candidates';
       document.querySelectorAll('#table th').forEach(function (th) { th.removeAttribute('data-active'); });
       renderBoard();
     });
-    var numeric = ['tvl', 'ch7', 'implied', 'multiple', 'age'];
+    var numeric = ['tvl', 'ch7', 'implied', 'p75', 'age', 'odds', 'perHour'];
     document.querySelectorAll('#table th[data-sort]').forEach(function (th) {
       th.addEventListener('click', function () {
         var key = th.getAttribute('data-sort');
-        if (view.sort === key) view.dir = -view.dir;
-        else view.dir = numeric.indexOf(key) >= 0 ? -1 : 1;
+        if (view.sort === key) view.dir = -view.dir; else view.dir = numeric.indexOf(key) >= 0 ? -1 : 1;
         view.sort = key;
         document.querySelectorAll('#table th').forEach(function (h) { h.removeAttribute('data-active'); });
         th.setAttribute('data-active', view.dir > 0 ? 'asc' : 'desc');
@@ -373,12 +304,11 @@
     });
   }
 
-  // ---------- live peers ----------
+  // ---------- live ----------
   function renderLive() {
     $('#liveN').textContent = R.live.length;
     var body = $('#liveBody');
     body.replaceChildren();
-    var med = R.model.globalMedian;
     R.live.forEach(function (p, i) {
       var tr = el('tr');
       tr.appendChild(el('td', 'num rank', i + 1));
@@ -391,13 +321,11 @@
       tr.appendChild(el('td', 'num money', money(p.mcap)));
       tr.appendChild(el('td', 'num ' + (p.ch7 > 0 ? 'up' : p.ch7 < 0 ? 'dn' : 'flat'), pct(p.ch7)));
       tr.appendChild(el('td', 'num multiple', multi(p.multiple)));
-      var rel = el('td', 'num ' + (p.multiple >= med ? 'up' : 'dn'), (p.multiple / med).toFixed(2) + '× median');
-      tr.appendChild(rel);
       body.appendChild(tr);
     });
   }
 
-  // ---------- what-if sandbox ----------
+  // ---------- detail ----------
   function sandbox(r, host) {
     var box = el('div', 'sandbox');
     var head = el('div', 'sbHead');
@@ -406,35 +334,38 @@
     reset.type = 'button';
     head.appendChild(reset);
     box.appendChild(head);
-    box.appendChild(el('p', 'sbHint', 'Move the three snapshot inputs and the same formula reprices this protocol.'));
-
-    var tvlMax = 15000000000;
+    box.appendChild(el('p', 'sbHint', 'Move TVL to reprice the launch; move growth or age to reprice the token odds.'));
     var tvlSlide = el('input'); tvlSlide.type = 'range'; tvlSlide.min = '0'; tvlSlide.max = '1000'; tvlSlide.step = '1';
     var growthSlide = el('input'); growthSlide.type = 'range'; growthSlide.min = '-60'; growthSlide.max = '120'; growthSlide.step = '1';
     var ageSlide = el('input'); ageSlide.type = 'range'; ageSlide.min = '0'; ageSlide.max = '1825'; ageSlide.step = '1';
-    var tvlOut = el('b'); var growthOut = el('b'); var ageOut = el('b');
+    var tvlOut = el('b'), growthOut = el('b'), ageOut = el('b');
     var result = el('div', 'sbOut');
-    var valueOut = el('b'); var bandOut = el('em');
-    result.appendChild(el('span', null, 'Implied value'));
+    var valueOut = el('b'), oddsOut = el('b'), bandOut = el('em');
+    result.appendChild(el('span', null, 'Implied'));
     result.appendChild(valueOut);
+    result.appendChild(el('span', null, 'Odds'));
+    result.appendChild(oddsOut);
     result.appendChild(bandOut);
-
     function tvlToSlider(v) { return Math.round(1000 * Math.log(Math.max(5000000, v) / 5000000) / Math.log(3000)); }
     function sliderToTvl(v) { return 5000000 * Math.pow(3000, v / 1000); }
     function draw() {
       var tvl = sliderToTvl(Number(tvlSlide.value));
-      var growth = Number(growthSlide.value);
+      var growth = Number(growthSlide.value) / 100;
       var age = Number(ageSlide.value);
-      var g = Math.exp(0.3 * Math.max(-60, Math.min(120, growth)) / 100);
-      var m = 0.6 + 0.4 * Math.min(age, 1095) / 1095;
-      var implied = Math.max(1, Math.round(tvl * r.terms.peerMultiple * g * m));
-      var lo = Math.round(implied * (r.low / r.implied));
-      var hi = Math.round(implied * (r.high / r.implied));
+      var implied = Math.max(1, Math.round(valueAt(tvl)));
+      var odds = oddsAt(r, growth, age);
       tvlOut.textContent = money(tvl);
-      growthOut.textContent = pct(growth);
+      growthOut.textContent = pct(growth * 100);
       ageOut.textContent = year(age);
       valueOut.textContent = money(implied);
-      bandOut.textContent = '80% band ' + money(lo) + ' – ' + money(hi) + ' · ×' + (implied / tvl).toFixed(3) + ' TVL';
+      oddsOut.textContent = Math.round(odds * 100) + '%';
+      bandOut.textContent = 'P25–P75 ' + money(implied * R.model.value.bands.p25) + ' – ' + money(implied * R.model.value.bands.p75);
+    }
+    function resetAll() {
+      tvlSlide.value = String(tvlToSlider(r.tvl));
+      growthSlide.value = String(Math.round((r.ch7 === null ? 0 : Math.max(-60, Math.min(120, r.ch7)))));
+      ageSlide.value = String(Math.round(r.age === null ? 365 : Math.min(1825, r.age)));
+      draw();
     }
     function row(label, slide, out) {
       var line = el('label', 'sbRow');
@@ -447,35 +378,23 @@
     box.appendChild(row('7-day growth', growthSlide, growthOut));
     box.appendChild(row('No token for', ageSlide, ageOut));
     box.appendChild(result);
-    function resetAll() {
-      tvlSlide.value = String(tvlToSlider(r.tvl));
-      growthSlide.value = String(Math.round(r.ch7 === null ? 0 : Math.max(-60, Math.min(120, r.ch7))));
-      ageSlide.value = String(Math.round(r.age === null ? 365 : Math.min(1825, r.age)));
-      draw();
-    }
     [tvlSlide, growthSlide, ageSlide].forEach(function (s) { s.addEventListener('input', draw); });
     reset.addEventListener('click', resetAll);
     resetAll();
     host.appendChild(box);
   }
-
-  // ---------- detail ----------
   function detail(slug) {
     var r = R.rows.filter(function (x) { return x.slug === slug; })[0];
     var host = $('#detailView');
     host.replaceChildren();
-    if (!r) {
-      host.appendChild(el('p', 'empty', 'No protocol named ' + slug + ' on this board.'));
-      return;
-    }
+    if (!r) { host.appendChild(el('p', 'empty', 'No protocol named ' + slug + ' on this board.')); return; }
     var back = el('a', 'back', '← Back to the radar board');
     back.href = '#/board';
     host.appendChild(back);
 
     var top = el('div', 'detailTop');
     var title = el('div', 'detailTitle');
-    var rank = el('span', 'rankChip' + (r.candidate ? '' : ' dim'), r.candidate ? '#' + r.candidateRank : 'not a candidate');
-    title.appendChild(rank);
+    title.appendChild(el('span', 'rankChip' + (r.candidate ? '' : ' dim'), r.candidate ? '#' + r.candidateRank : 'not a candidate'));
     title.appendChild(el('h2', null, r.name));
     if (r.watch) title.appendChild(chip('WATCHLIST', 'watch'));
     if (r.candidate) title.appendChild(chip('PRE-TOKEN', 'ok'));
@@ -490,9 +409,9 @@
     var stats = el('div', 'statGrid');
     [
       ['Implied value', money(r.implied), 'if its token launched on this record', true],
-      ['80% band', money(r.low) + ' – ' + money(r.high), 'held-out coverage ' + Math.round(r.bandCoverage * 100) + '%', false],
+      ['P25–P75', money(r.p25) + ' – ' + money(r.p75), 'half of held-out peers', false],
       ['TVL', money(r.tvl), pct(r.ch7) + ' over 7 days', false],
-      ['No token for', r.age === null ? 'unknown' : Math.round(r.age / 30.4) + ' months', r.listed ? 'listed ' + r.listed : 'listing date not recorded', false]
+      ['Token odds', Math.round(r.odds * 100) + '%', 'peer record, not a forecast', false]
     ].forEach(function (s) {
       var d = el('div', 'stat');
       d.appendChild(el('span', null, s[0]));
@@ -504,14 +423,13 @@
 
     var cols = el('div', 'cols');
     var left = el('div', 'panel');
-    left.appendChild(el('h3', null, 'How the number is built'));
+    left.appendChild(el('h3', null, 'How the figure is made'));
+    var multiple = r.implied / r.tvl;
     var terms = el('div', 'terms');
     [
       ['TVL', money(r.tvl), 'snapshot'],
-      ['Peer multiple', multi(r.terms.peerMultiple), r.peers + ' live peer' + (r.peers === 1 ? '' : 's') + (r.terms.categoryMedian === null ? ', all-market fallback' : ', category ' + multi(r.terms.categoryMedian))],
-      ['Growth', r.terms.growth.toFixed(3) + '×', '7d ' + pct(r.ch7)],
-      ['Maturity', r.terms.maturity.toFixed(3) + '×', r.age === null ? 'age assumed 1 yr' : year(r.age) + ' without a token'],
-      ['Implied', money(r.implied), 'TVL × peer × growth × maturity', true]
+      ['Curve multiple', multi(multiple), 'at this TVL'],
+      ['Implied', money(r.implied), 'TVL × multiple', true]
     ].forEach(function (t) {
       var d = el('div', 'term' + (t[3] ? ' result' : ''));
       d.appendChild(el('span', null, t[0]));
@@ -520,21 +438,20 @@
       terms.appendChild(d);
     });
     left.appendChild(terms);
-    var sc = el('div', 'scenarios');
-    [['Conservative', r.scenarios.conservative], ['Base', r.scenarios.base], ['Stretch', r.scenarios.stretch]].forEach(function (pair, i) {
-      var item = el('span', i === 1 ? 'base' : '');
-      item.appendChild(document.createTextNode(pair[0]));
-      item.appendChild(el('b', null, money(pair[1])));
-      sc.appendChild(item);
-    });
-    sc.appendChild(el('em', null, 'a quarter of held-out peers land below / above'));
-    left.appendChild(sc);
-    var peerWord = r.peers === 1 ? '1 live-token peer' : r.peers + ' live-token peers';
-    left.appendChild(el('p', null,
-      'The category multiple is the geometric median market-cap/TVL of ' + peerWord + ' in ' + (r.category || 'this category') +
-      ', shrunk ' + Math.round((1 - r.terms.shrinkage) * 100) + '% toward the all-market ' + multi(r.terms.globalMedian) +
-      '. That gives ' + multi(r.terms.peerMultiple) + ', then growth and maturity adjust it. The 80% band is the held-out residual range for ' +
-      r.confidence + '-confidence protocols.'));
+    left.appendChild(el('p', null, 'The fitted curve is log(market cap / TVL) = ' + R.model.value.intercept.toFixed(3) + ' ' + (R.model.value.slope < 0 ? '−' : '+') + ' ' + Math.abs(R.model.value.slope).toFixed(3) + ' × ln(TVL). At $100M TVL that is a ' + multi(R.model.value.multipleAt100m) + ' multiple; at this protocol TVL it is ' + multi(multiple) + '. Held out, the curve misses by ' + R.model.value.loo.toFixed(2) + '× (leave-one-out) and ' + R.model.value.wf.toFixed(2) + '× (walk-forward).'));
+    var oddsBox = el('div', 'sandbox');
+    var oddsHead = el('div', 'sbHead');
+    oddsHead.appendChild(el('h4', null, 'Token odds'));
+    oddsHead.appendChild(el('b', 'oddsBig', Math.round(r.odds * 100) + '%'));
+    oddsBox.appendChild(oddsHead);
+    oddsBox.appendChild(el('p', 'sbHint', 'The logistic model uses size (' + r.oddsInput.size.toFixed(1) + '), log age (' + r.oddsInput.age.toFixed(2) + '), 7-day growth (' + pct(r.oddsInput.growth * 100) + ') and the category rate (' + Math.round(r.oddsInput.categoryRate * 100) + '%). It is the peers\' record, not a promise this protocol launches.'));
+    var bar = el('div', 'odds wide');
+    var track = el('div', 'track');
+    var fill = el('i'); fill.style.width = Math.round(r.odds * 100) + '%';
+    track.appendChild(fill);
+    bar.appendChild(track);
+    oddsBox.appendChild(bar);
+    left.appendChild(oddsBox);
     sandbox(r, left);
 
     var peers = R.live.filter(function (p) { return (p.category || 'Uncategorised') === (r.category || 'Uncategorised'); }).slice(0, 6);
@@ -560,9 +477,22 @@
     }
     cols.appendChild(left);
 
+    var f = farm(r, R.model.planSize);
     var right = el('div', 'panel');
-    right.appendChild(el('h3', null, 'Farm plan'));
-    right.appendChild(el('p', null, '$' + r.plan.capital + ' capital · $' + r.plan.gas + ' gas · ' + r.plan.hours + ' hours over ' + r.plan.weeks + ' weeks · $' + r.plan.gasPerHour + ' gas per active hour. Concrete steps, not a slogan.'));
+    right.appendChild(el('h3', null, 'Farm verdict'));
+    var vh = el('div', 'verdictHead');
+    vh.appendChild(el('span', 'verdict v-' + r.plan.verdict, r.plan.verdict.toUpperCase()));
+    vh.appendChild(el('b', null, '$' + f.net.toFixed(0) + ' net · $' + f.perHour.toFixed(0) + ' per hour'));
+    right.appendChild(vh);
+    var econ = el('div', 'terms');
+    [['Drop', money(f.drop), '7% of implied × position/TVL'], ['Fees', '$' + f.fees.toFixed(2), 'gas for 8 steps'], ['T-bill', money(f.benchmark), 'same $10k, 12 weeks'], ['Per hour', '$' + f.perHour.toFixed(0), 'net / active hour']].forEach(function (t) {
+      var d = el('div', 'term');
+      d.appendChild(el('span', null, t[0]));
+      d.appendChild(el('b', null, t[1]));
+      d.appendChild(el('em', null, t[2]));
+      econ.appendChild(d);
+    });
+    right.appendChild(econ);
     var plan = el('table', 'mini planTable');
     var thead = el('thead');
     var hr = el('tr');
@@ -580,7 +510,7 @@
     });
     plan.appendChild(pbody);
     right.appendChild(plan);
-    right.appendChild(el('div', 'verdict', r.plan.verdict));
+    right.appendChild(el('div', 'verdict', r.plan.verdict === 'worth' ? 'Worth farming at $10,000: the modelled drop beats the 4% T-bill after fees. Cap the position at what you can leave for 12 weeks.' : r.plan.verdict === 'marginal' ? 'Marginal: the modelled drop clears fees but not the T-bill. Farm only if you already hold the asset or value the activity record.' : 'Skip: fees exceed the modelled drop at this size. Wait for a larger implied value or lower fees.'));
     right.appendChild(el('h3', null, 'Before you spend gas'));
     var ul = el('ul', 'dd');
     r.dd.forEach(function (t) { ul.appendChild(el('li', null, t)); });
@@ -589,15 +519,16 @@
     host.appendChild(cols);
   }
 
-  // ---------- calibration chart ----------
-  function drawCalibration(check) {
+  // ---------- method ----------
+  function drawCalibration() {
     var host = $('#calChart');
     host.replaceChildren();
-    if (!check.points || check.points.length === 0) return;
-    var W = 1160, H = 300, L = 54, R = 18, T = 14, B = 40;
-    var vals = check.points.map(function (p) { return Math.log10(p.actual); }).concat(check.points.map(function (p) { return Math.log10(p.predicted); }));
+    var pts = R.model.value.points;
+    if (!pts || !pts.length) return;
+    var W = 1160, H = 300, L = 54, Rr = 18, T = 14, B = 40;
+    var vals = pts.map(function (p) { return Math.log10(p.actual); }).concat(pts.map(function (p) { return Math.log10(p.predicted); }));
     var lo = Math.floor(Math.min.apply(null, vals)), hi = Math.ceil(Math.max.apply(null, vals));
-    var sx = function (v) { return L + ((v - lo) / (hi - lo)) * (W - L - R); };
+    var sx = function (v) { return L + ((v - lo) / (hi - lo)) * (W - L - Rr); };
     var sy = function (v) { return H - B - ((v - lo) / (hi - lo)) * (H - T - B); };
     var root = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Held-out implied value against actual market cap' });
     for (var e = lo; e <= hi; e++) {
@@ -607,81 +538,121 @@
       root.appendChild(svgText(L - 8, sy(e) + 3, money(Math.pow(10, e)), 'end'));
     }
     root.appendChild(svgEl('line', { x1: sx(lo), y1: sy(lo), x2: sx(hi), y2: sy(hi), stroke: '#f5b33c', 'stroke-width': '1.4', 'stroke-dasharray': '5 5', opacity: '0.85' }));
-    var colors = { high: '#2fd6b5', medium: '#f5b33c', low: '#9a86b8' };
-    check.points.forEach(function (p) {
+    pts.forEach(function (p) {
       var x = Math.log10(p.actual), y = Math.log10(p.predicted);
-      var c = svgEl('circle', { cx: sx(x), cy: sy(y), r: 3.4, fill: colors[p.bucket], opacity: 0.72 });
+      var inside = p.actual >= p.predicted * R.model.value.bands.p10 && p.actual <= p.predicted * R.model.value.bands.p90;
+      var c = svgEl('circle', { cx: sx(x), cy: sy(y), r: 3.4, fill: inside ? '#2fd6b5' : '#9a86b8', opacity: 0.72 });
       var title = svgEl('title', {});
       title.textContent = p.slug + ': actual ' + money(p.actual) + ', implied ' + money(p.predicted);
       c.appendChild(title);
       root.appendChild(c);
     });
-    var legend = [['high', 'high'], ['medium', 'medium'], ['low', 'low']];
-    legend.forEach(function (l, i) {
-      var lx = W - R - 210 + i * 70;
-      root.appendChild(svgEl('circle', { cx: lx, cy: T + 4, r: 4, fill: colors[l[0]] }));
-      root.appendChild(svgText(lx + 9, T + 8, l[1], 'start'));
-    });
     host.appendChild(root);
   }
-
-  // ---------- method ----------
   function renderMethod() {
-    var c = R.model.check;
-    var wf = c.walkForward;
-    $('#checkIntro').textContent = c.folds + '-fold cross-validation: fit the category multiples on four fifths of the ' + R.model.livePeers + ' live-token protocols, then price the fifth it has never seen (' + c.n + ' held-out predictions). Walk-forward test: fit the older 70% of dated peers, then price the ' + wf.n + ' newer tokens it never saw — median miss ' + wf.medianFactor.toFixed(2) + 'x, rank correlation ' + wf.spearman.toFixed(2) + ', band coverage ' + Math.round(wf.coverage * 100) + '%.';
-    var bt = $('#bucketTable tbody');
-    bt.replaceChildren();
-    c.buckets.forEach(function (b) {
+    var v = R.model.value, o = R.model.odds;
+    $('#valueEq').textContent = 'a = ' + v.intercept.toFixed(3) + ', b = ' + v.slope.toFixed(3) + '; multiple at $100M = ' + v.multipleAt100m.toFixed(3) + '×. Flat baseline misses by ' + v.baselineLoo.toFixed(2) + '× / ' + v.baselineWf.toFixed(2) + '×.';
+    var vt = $('#valueTerms tbody');
+    vt.replaceChildren();
+    v.terms.forEach(function (t) {
       var tr = el('tr');
-      tr.appendChild(el('td', null, b.bucket[0].toUpperCase() + b.bucket.slice(1)));
-      tr.appendChild(el('td', 'num', b.n));
-      tr.appendChild(el('td', 'num', b.low.toFixed(3) + '× – ' + b.high.toFixed(1) + '×'));
-      tr.appendChild(el('td', 'num', Math.round(b.coverage * 100) + '%'));
-      tr.appendChild(el('td', 'num', b.medianFactor.toFixed(2) + '×'));
-      bt.appendChild(tr);
+      tr.appendChild(el('td', null, t.term));
+      tr.appendChild(el('td', 'num', t.loo.toFixed(2) + '×'));
+      tr.appendChild(el('td', 'num', t.wf.toFixed(2) + '×'));
+      tr.appendChild(el('td', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'tested, dropped'));
+      tr.title = t.note;
+      vt.appendChild(tr);
     });
-    var score = $('#scoreRow');
-    score.replaceChildren();
-    [['Rank correlation', c.spearman.toFixed(2), 'predicted vs actual, held out'], ['Median miss', c.medianFactor.toFixed(2) + '×', 'factor, not a percent'], ['Within 2×', Math.round(c.within2x * 100) + '%', 'of held-out peers'], ['Walk-forward miss', c.walkForward.medianFactor.toFixed(2) + '×', 'older peers to newer']].forEach(function (s) {
+    $('#oddsEq').textContent = 'Base rate ' + (o.baseRate * 100).toFixed(1) + '%. Brier ' + o.brier.toFixed(3) + ' vs ' + o.brierBase.toFixed(3) + ' base; walk-forward ' + o.brierWf.toFixed(3) + ' vs ' + o.brierWfBase.toFixed(3) + '.';
+    var ot = $('#oddsTerms tbody');
+    ot.replaceChildren();
+    o.terms.forEach(function (t) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, t.term));
+      tr.appendChild(el('td', 'num', t.loo.toFixed(3)));
+      tr.appendChild(el('td', 'num', t.wf.toFixed(3)));
+      tr.appendChild(el('td', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'tested, dropped'));
+      tr.title = t.note;
+      ot.appendChild(tr);
+    });
+    $('#rangeText').textContent = 'P25–P75 ran ' + v.bands.p25.toFixed(2) + '× to ' + v.bands.p75.toFixed(2) + '× of the point estimate and covered ' + Math.round(v.coverage.p25 * 100) + '% of ' + v.coverage.n + ' held-out protocols. P10–P90 ran ' + v.bands.p10.toFixed(2) + '× to ' + v.bands.p90.toFixed(2) + '× and covered ' + Math.round(v.coverage.p10 * 100) + '%.';
+    var rr = $('#rangeRow');
+    rr.replaceChildren();
+    [['Held out', v.coverage.n, 'live-token protocols'], ['P25–P75', Math.round(v.coverage.p25 * 100) + '%', 'covered'], ['P10–P90', Math.round(v.coverage.p10 * 100) + '%', 'covered']].forEach(function (s) {
       var d = el('div', 'score');
       d.appendChild(el('span', null, s[0]));
       d.appendChild(el('b', null, s[1]));
       d.appendChild(el('em', null, s[2]));
-      score.appendChild(d);
+      rr.appendChild(d);
     });
-    drawCalibration(c);
-    var ct = $('#catTable tbody');
-    ct.replaceChildren();
-    c.categories.slice(0, 12).forEach(function (r) {
-      var tr = el('tr');
-      tr.appendChild(el('td', null, r.name));
-      tr.appendChild(el('td', 'num', r.n));
-      tr.appendChild(el('td', 'num', r.medianMultiple.toFixed(2) + '×'));
-      tr.appendChild(el('td', 'num', r.medianFactor.toFixed(2) + '×'));
-      ct.appendChild(tr);
-    });
-    var kt = $('#countTable');
-    var kb = el('tbody');
-    [
-      ['Protocols in the snapshot', R.counts.protocols],
-      ['Records with no token', R.counts.preToken],
-      ['Launch candidates ranked', R.counts.candidates],
-      ['On the snapshot watchlist', R.counts.watchlist],
-      ['Live tokens separated', R.counts.live],
-      ['Excluded: bridge TVL', R.counts.excludedBridge],
-      ['Excluded: exchange product', R.counts.excludedCex],
-      ['Excluded: wrapped / versioned', R.counts.excludedProduct],
-      ['Token records without a price', R.counts.unpriced],
-      ['Board rows written', R.rows.length]
-    ].forEach(function (r) {
+    drawCalibration();
+    var ct = $('#countTable');
+    var cb = el('tbody');
+    [['Protocols in the snapshot', R.counts.protocols], ['Records with no token', R.counts.preToken], ['Launch candidates', R.counts.candidates], ['On the watchlist', R.counts.watchlist], ['Live tokens separated', R.counts.live], ['Token records without a price', R.counts.unpriced], ['Excluded: bridge TVL', R.counts.excludedBridge], ['Excluded: exchange product', R.counts.excludedCex], ['Excluded: wrapped / versioned', R.counts.excludedProduct], ['Farm verdict: worth', R.counts.worth], ['Farm verdict: marginal', R.counts.marginal], ['Farm verdict: skip', R.counts.skip]].forEach(function (r) {
       var tr = el('tr');
       tr.appendChild(el('td', null, r[0]));
       tr.appendChild(el('td', 'num', FMT.format(r[1])));
-      kb.appendChild(tr);
+      cb.appendChild(tr);
     });
-    kt.replaceChildren(kb);
-    $('#provenance').textContent = 'Source: ' + R.source + '. Snapshot date ' + R.asOf + ', watchlist floor $' + FMT.format(R.floor) + '.';
+    ct.replaceChildren(cb);
+    var fr = $('#farmRow');
+    fr.replaceChildren();
+    [['Plan size', '$10,000', 'per farm'], ['Drop share', '7%', 'of implied value'], ['T-bill', '$' + R.model.benchmark.toFixed(0), '12 weeks'], ['Worth', R.counts.worth + ' of ' + R.counts.candidates, 'beats it after fees']].forEach(function (s) {
+      var d = el('div', 'score');
+      d.appendChild(el('span', null, s[0]));
+      d.appendChild(el('b', null, s[1]));
+      d.appendChild(el('em', null, s[2]));
+      fr.appendChild(d);
+    });
+    $('#provenance').textContent = 'Source: ' + R.source + '. Snapshot ' + R.asOf + ', watchlist floor $' + FMT.format(R.floor) + '.';
+  }
+
+  // ---------- compare ----------
+  function renderCompare(params) {
+    var host = $('#compareBody');
+    host.replaceChildren();
+    var fromUrl = params ? (params.get('slugs') || '').split(',').filter(Boolean) : [];
+    var chosen = fromUrl.length
+      ? fromUrl.map(function (slug) { return R.rows.filter(function (r) { return r.slug === slug; })[0]; }).filter(Boolean).slice(0, 4)
+      : R.rows.filter(function (r) { return pins.has(r.slug); }).slice(0, 4);
+    if (chosen.length < 2) {
+      host.appendChild(el('p', 'empty', chosen.length === 0 ? 'Star two or more rows on the board to compare them here.' : 'One more star and the compare table appears.'));
+      return;
+    }
+    var table = el('table', 'compareTable');
+    var thead = el('thead');
+    var hr = el('tr');
+    hr.appendChild(el('th', null, 'Metric'));
+    chosen.forEach(function (r) { hr.appendChild(el('th', 'num', r.name)); });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var body = el('tbody');
+    [
+      ['Implied value', function (r) { return money(r.implied); }],
+      ['P25–P75', function (r) { return money(r.p25) + ' – ' + money(r.p75); }],
+      ['TVL', function (r) { return money(r.tvl); }],
+      ['7-day change', function (r) { return pct(r.ch7); }],
+      ['No token for', function (r) { return year(r.age); }],
+      ['Token odds', function (r) { return Math.round(r.odds * 100) + '%'; }],
+      ['Farm verdict', function (r) { return r.plan.verdict; }],
+      ['Net per hour', function (r) { return '$' + r.plan.perHour.toFixed(0); }]
+    ].forEach(function (row) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, row[0]));
+      chosen.forEach(function (r) { tr.appendChild(el('td', 'num', row[1](r))); });
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    host.appendChild(table);
+    var links = el('p', 'footnote');
+    links.appendChild(document.createTextNode('Open a detail page: '));
+    chosen.forEach(function (r, i) {
+      if (i) links.appendChild(document.createTextNode(' · '));
+      var a = el('a', 'inlineLink', r.name);
+      a.href = '#/p/' + encodeURIComponent(r.slug);
+      links.appendChild(a);
+    });
+    host.appendChild(links);
   }
 
   // ---------- boot ----------
@@ -689,20 +660,18 @@
     if (!params) return;
     view.q = params.get('q') || '';
     view.cat = params.get('cat') || 'all';
-    view.conf = params.get('conf') || 'all';
+    view.verdict = params.get('verdict') || 'all';
     view.scope = params.get('scope') || 'candidates';
     $('#q').value = view.q;
     if ($('#cat').querySelector('option[value="' + CSS.escape(view.cat) + '"]')) $('#cat').value = view.cat;
-    $('#conf').value = view.conf;
+    $('#verdict').value = view.verdict;
     $('#scope').value = view.scope;
   }
   function render() {
     var r = route();
     show(r.name);
-    if (r.name === 'board') {
-      applyParams(r.params);
-      renderBoard();
-    } else if (r.name === 'live') renderLive();
+    if (r.name === 'board') { applyParams(r.params); renderBoard(); }
+    else if (r.name === 'live') renderLive();
     else if (r.name === 'method') renderMethod();
     else if (r.name === 'compare') renderCompare(r.params);
     else detail(r.slug);

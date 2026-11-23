@@ -92,9 +92,13 @@ const board = radar.rows.map((r) => {
     age_days: r.age,
     low_usd: r.low,
     high_usd: r.high,
+    p25_usd: r.p25,
+    p75_usd: r.p75,
+    token_odds: r.odds,
+    farm_verdict: r.plan.verdict,
+    net_per_hour: r.plan.perHour,
     token_status: r.candidate ? 'pre-token' : 'not-a-launch-candidate',
     watchlist: r.watch,
-    confidence: r.confidence,
   };
 });
 
@@ -159,6 +163,7 @@ writeFileSync(
 const c = radar.counts;
 process.stdout.write(
   `token radar: ${board.length} rows (${c.candidates} candidates of ${c.preToken} pre-token), ` +
-    `${c.watchlist}/${c.watchlist} watchlist, ${c.live} live peers, global ${radar.model.globalMedian}x; ` +
-    `backtest n=${radar.model.check.n} median ${radar.model.check.medianFactor}x rho ${radar.model.check.spearman}\n`,
+    `${c.watchlist}/${c.watchlist} watchlist, ${c.live} live peers; value ${radar.model.value.loo}x LOO / ` +
+    `${radar.model.value.wf}x walk-forward (flat ${radar.model.value.baselineLoo}x / ${radar.model.value.baselineWf}x); ` +
+    `odds Brier ${radar.model.odds.brier} vs ${radar.model.odds.brierBase}\n`,
 );
