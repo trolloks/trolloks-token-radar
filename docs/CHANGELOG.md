@@ -291,6 +291,10 @@ The codex's remaining criterion-2 note and the leader's farm/range presentation:
   price the token odds, not the launch value.
 - Farm counts: 18 worth / 180 marginal / 0 skip; source 64,557/65,536; dossier 64,826.
 - Gate all PASS; two builds byte-identical; screenshots rebuilt.
-- Commit `86aeb38`; bundle `6859ec7b...` (19,819,804 bytes); site check overall true,
-  85.2% authored (2,166/2,540); scheduled 2026-11-24T00:15:30Z; scheduler PID 1333888.
+- The v12 screenshots exposed two presentation bugs, both fixed: the detail's verdict
+  header used the old $10K model while the plan and share table used the $250K capital
+  (now $653 net / $251 per hour for Steakhouse), and the model label still said radar-v11
+  (now radar-v12). Source 64,555/65,536; dossier 64,824.
+- Commit `d600379`; bundle `a50261de...` (20,501,816 bytes); site check overall true,
+  85.3% authored (2,191/2,566); scheduled 2026-11-24T00:15:30Z; scheduler PID 1381966.
   This is the last quota entry.
