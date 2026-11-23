@@ -247,7 +247,10 @@ v10 changes (commit `41d044a`, branch `v10`):
   RWA category; the board, detail and planner screenshots were rebuilt.
 
 Gate: all local rows pass; two builds are byte-identical; source 65,535/65,536;
-dossier 1,433,997; screenshots 264,931 / 255,011 / 255,788 / 249,017 bytes. Not
-submitted yet: it awaits the v9c score and the next quota. The remaining leader
-features (browser refit/checksum, 0.02%-of-TVL sizing, rank range) need source trimming
-first; the one byte of headroom is the constraint.
+dossier 1,433,997; screenshots 264,931 / 255,011 / 255,788 / 249,017 bytes. The site's
+pre-submit `check` is `overall: true` at 84.7% authored (2,066 of 2,439 lines; main.ts
+116 authored); bundle `69723984...` is 18,994,533 bytes. Scheduled for
+2026-11-24T00:05:30Z, after v9c; the scheduler (PID 1238117) submits it, polls both
+scores and pins the best of v5/v9c/v10. The remaining leader features (browser
+refit/checksum, 0.02%-of-TVL sizing, rank range) need source trimming first; the one
+byte of headroom is the constraint.

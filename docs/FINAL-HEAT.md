@@ -26,15 +26,16 @@ complete dev rating.
 | v8b | `4615746` | not submitted | - | fallback bundle `radar-v8b.tar.gz` |
 | v9 | `4689a8f` (branch `v9-category`) | not submitted | - | superseded by v9c |
 | v9c | `4c46abf` (branch `v9-category`) | scheduled 2026-11-24T00:00:30Z | pending | bundle `radar-v9c.tar.gz`; auto-pick if it beats v5 |
-| v10 | `41d044a` (branch `v10`) | not submitted | - | candidate: cumulative tests + control, 19/198 farm view; gate passes; awaits v9c score |
+| v10 | `41d044a` (branch `v10`) | scheduled 2026-11-24T00:05:30Z | pending | bundle `radar-v10.tar.gz` (18.99 MB); check overall true, 84.7% authored; scheduler picks best of v5/v9c/v10 |
 
 After v9c scores: pick the higher of v5 and v9c (or v8b if it is used) with
 `PUT /api/competitions/token-radar-01/final-entry`, or
 `node cli/makefun.mjs final token-radar-01 <submission id>`. A later entry does not replace
 the pick by itself. The armed scheduler `/tmp/opencode/submit-pick-v9c.sh` does this
 automatically: it submits v9c, polls its score, and pins it only if it exceeds 942,846.
-The v10 candidate (`41d044a`) is the next measurement after the v9c score and quota; pick
-it only if its dev rate beats the current pick.
+The v10 candidate (`41d044a`) is scheduled at 00:05:30Z, after v9c; the scheduler
+(`/tmp/opencode/submit-pick-v10.sh`, PID 1238117) polls both scores and pins the best of
+v5/v9c/v10. It is picked only if its dev rate beats the current pick.
 
 ## Final heat
 
