@@ -315,6 +315,11 @@ The codex's remaining criterion-2 note and the leader's farm/range presentation:
 - The KPI and the method paragraph named only the T-bill while the worth count also
   requires token odds of at least 75%. Both now state the two conditions. Source
   64,944/65,536; dossier 65,213.
+- The public title now names the exact stack, following the winner-style titles on the
+  CPU-time board: fitted log-TVL size curve + shrunk category, 3.40x LOO / 3.27x WF,
+  Brier odds 0.213, 5-shuffle control, browser refit FNV checksum, per-protocol farm
+  plans, rank ranges (186 characters). The bundle and commit are unchanged; the title is
+  a submit flag.
 - Commit `2f49c6e`; bundle `64e0c011...` (22,693,576 bytes); site check overall true,
-  85.5% authored (2,219/2,593); scheduled 2026-11-24T00:15:30Z; scheduler PID 1415878.
+  85.5% authored (2,219/2,593); scheduled 2026-11-24T00:15:30Z; scheduler PID 1517436.
   This is the last quota entry.

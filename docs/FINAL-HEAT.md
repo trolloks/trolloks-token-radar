@@ -28,7 +28,7 @@ complete dev rating.
 | v9c | `4c46abf` (branch `v9-category`) | scheduled 2026-11-24T00:00:30Z | pending | bundle `radar-v9c.tar.gz`; auto-pick if it beats v5 |
 | v10 | `41d044a` (branch `v10`) | scheduled 2026-11-24T00:05:30Z | pending | bundle `radar-v10.tar.gz` (18.99 MB); check overall true, 84.7% authored; scheduler picks best of v5/v9c/v10 |
 | v11 | `fd96b950` (branch `v11`) | scheduled 2026-11-24T00:10:30Z | pending | bundle `radar-v11.tar.gz` (19.71 MB); check overall true, 85.2% authored; codex planner/detail fixes; scheduler picks best of current and v11 |
-| v12 | `2f49c6e` (branch `v12`) | scheduled 2026-11-24T00:15:30Z | pending | per-protocol plan sizing with matching verdict/copy, both worth conditions, exact planner allocations, rank ranges, growth/age note; bundle 22.69 MB; 85.5% authored; last entry |
+| v12 | `2f49c6e` (branch `v12`) | scheduled 2026-11-24T00:15:30Z | pending | per-protocol plan sizing with matching verdict/copy, both worth conditions, exact planner allocations, rank ranges, growth/age note, stack-naming title; bundle 22.69 MB; 85.5% authored; last entry |
 
 After v9c scores: pick the higher of v5 and v9c (or v8b if it is used) with
 `PUT /api/competitions/token-radar-01/final-entry`, or
@@ -44,9 +44,9 @@ fixes) is scheduled at 00:10:30Z, after v10; its scheduler
 (`/tmp/opencode/submit-pick-v11.sh`, PID 1306716) waits for the v10 pick, then reads the
 current final entry's score and pins the best of v5/v9c/v10/v11.
 The v12 candidate (`2f49c6e`, per-protocol plan sizing with a matching verdict and copy,
-both worth conditions, exact planner allocations, rank ranges, growth/age note) is
-scheduled at 00:15:30Z, after v11; its scheduler
-(`/tmp/opencode/submit-pick-v12.sh`, PID 1415878) waits for the v11 pick, then reads the
+both worth conditions, exact planner allocations, rank ranges, growth/age note, and a
+stack-naming title) is scheduled at 00:15:30Z, after v11; its scheduler
+(`/tmp/opencode/submit-pick-v12.sh`, PID 1517436) waits for the v11 pick, then reads the
 current final entry's score and pins the best of the current/v12. It is the last quota
 entry.
 
