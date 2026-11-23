@@ -72,3 +72,5 @@ Rank is the leaderboard row; the rate is the Bradley-Terry win rate against the 
 - Add three calibrated scenarios per protocol (P25 conservative, base, P75 stretch).
 - Account for all 758 protocols explicitly: 342 pre-token + 128 live + 288 unpriced.
 - Add a factual coverage/model/plans/page line under the flow strip.
+- Commit `0acae5d`, submission `01a20808-4e5e-762c-bd09-374868000479`, receipt 10:51:31 UTC.
+- Transcript gate locally: 82.5% of counted lines authored, 146 assistant turns, run record pass.
