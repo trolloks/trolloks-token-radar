@@ -9,4 +9,5 @@ date	iteration	commit	submission	change	judge_rate	rank	notes
 2026-11-23	v8	2a5101d24883e83a077c58c9453c096ab69bf2c2	not submitted	full term tables on the board, denser rows, planner as fourth screenshot	pending	pending	ready for the next quota day; v5 stays pinned
 2026-11-23	v8b	46157464adf25a33dd10a4780e33a87794e8c7e4	not submitted	full term tables on the board, fee/hours/verdict fixes from the codex review	pending	pending	bundle checked; quota resets 2026-11-24T00:00Z; v5 stays pinned
 2026-11-23	model test	none	not submitted	shrunk category effect k=20: LOO 3.40 vs 3.44, WF 3.27 vs 3.39	pending	pending	v9 candidate; cap prevents adoption now
-2026-11-23	v9	4689a8f147e72e9d70ac1605290f3fbaec0aa8e1	pending	shrunk category effect on the value model; 2 kept terms, LOO 3.40x, WF 3.27x	pending	pending	scheduled 2026-11-24T00:00:30Z; v8b fallback
+2026-11-23	v9	4689a8f147e72e9d70ac1605290f3fbaec0aa8e1	superseded	shrunk category effect on the value model; 2 kept terms, LOO 3.40x, WF 3.27x	none	none	superseded by v9c after review
+2026-11-23	v9c	4c46abf63ecd976d9567dbc7a51cd1904f02ff5f	pending	review fixes: expm1 category display, sandbox odds size, derived term flags	pending	pending	scheduled 2026-11-24T00:00:30Z; v8b/v9b fallbacks

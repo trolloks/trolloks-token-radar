@@ -191,3 +191,23 @@ within noise. Keep as the v9 candidate if the final heat needs another entry.
 - Commit `4689a8f` on `v9-category`. Scheduled to submit at 2026-11-24T00:00:30Z via
   `/tmp/opencode/submit-v9.sh`; v8b stays as the fallback bundle. v5 remains the final
   pick until v9 is scored.
+
+### v9c, 2026-11-23 — review fixes, scheduled
+
+Codex reviewed the v9 category effect and sandbox:
+- The detail printed the log category adjustment as a percent (0.5 read as 50% instead of
+  the actual +64.9%). Fixed with `expm1`; Steakhouse now shows +9.6%.
+- The sandbox passed the frozen `oddsInput.size` into the odds model, so moving the TVL
+  slider repriced the launch but not the odds. It now passes the sandbox TVL's log size.
+- The kept/dropped flags were hardcoded. They are now derived from the blind-test numbers:
+  a term is kept when both its leave-one-out and walk-forward miss are at or below the
+  size curve's.
+- Codex also noted the numbers cannot be independently reproduced from the dashboard
+  source alone (the snapshot and generated results are not in it), the walk-forward is a
+  cohort split rather than historical forecasting, and the range coverage is measured on
+  the residuals that set the bands. These are disclosed limits, not gate failures.
+
+- Commit `4c46abf`, bundle `radar-v9c.tar.gz`, checked (84.2% authored, 318 turns).
+- Gate: dashboard source 65,534 / 65,536; dossier 1,406,952; four 1280x1024 screenshots.
+- Scheduled at 2026-11-24T00:00:30Z; v8b and v9b remain fallbacks. v5 is still the final
+  pick until v9c is scored.
