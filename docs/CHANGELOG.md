@@ -148,3 +148,22 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - v5 low is below the paid-places line (10th-best low 949,612), but the final heat
   re-judges every finalist afresh, so the dev point estimate is not the final result.
 - The line can rise as more entries arrive; monitor it before the deadline.
+
+### v8b, 2026-11-23 — review fixes, ready for the next quota day
+
+Codex reviewed v8 and proved three farm-economics bugs:
+- `farmPlan` counted two one-off gas charges while the steps list three. Now fees =
+  3 gas + weekly x weeks + exit, so the plan, net and net/hour agree.
+- The planner's "Worth only" filter used the $10,000 verdict, then showed the verdict at
+  the allocated size, so it could list skip rows. It now filters on the allocated verdict.
+- The planner's net/hour used the maximum protocol hours instead of the total active work.
+  It now sums active hours; the $10k / six-protocol case reports $24/hour, not $140.
+
+Codex also noted two limits that stand: growth and age enter through the token-odds model
+rather than the value curve (disclosed), and plans are category templates because the
+snapshot carries no pool or route data.
+
+- Commit `4615746`, bundle `radar-v8b.tar.gz`, transcript check passes (83.6% authored).
+- Gate: dashboard source 65,2xx / 65,536; dossier 1,397,102; four 1280x1024 screenshots.
+- Not submitted: today's quota is spent. Submit after 2026-11-24T00:00:00Z and keep v5
+  pinned until v8b is measured.

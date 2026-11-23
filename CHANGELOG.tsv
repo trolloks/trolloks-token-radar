@@ -7,3 +7,4 @@ date	iteration	commit	submission	change	judge_rate	rank	notes
 2026-11-23	v6	pending	not submitted	ledger bar, board evidence strip, position-size farm scenarios	pending	pending	built and held; model unchanged from v5
 2026-11-23	v7	5c4bb5a9b46037a75402a39078a0175bd1712a77	01a2082f-f28f-737e-b47b-3664d79672c8	farm planner page with budget/horizon/risk and portfolio totals; source trimmed to the cap	939310	pending	v5 stays pinned at 942846; planner did not move the judge
 2026-11-23	v8	2a5101d24883e83a077c58c9453c096ab69bf2c2	not submitted	full term tables on the board, denser rows, planner as fourth screenshot	pending	pending	ready for the next quota day; v5 stays pinned
+2026-11-23	v8b	46157464adf25a33dd10a4780e33a87794e8c7e4	not submitted	full term tables on the board, fee/hours/verdict fixes from the codex review	pending	pending	bundle checked; quota resets 2026-11-24T00:00Z; v5 stays pinned
