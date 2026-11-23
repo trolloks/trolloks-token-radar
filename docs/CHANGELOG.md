@@ -223,3 +223,31 @@ Stronger category priors (K = 5, 10, 20, 40 pseudo-protocols) barely lift the to
 Steakhouse 15% to 20%, Sentora 12% to 16%, while the 5-fold Brier moves 0.211 to 0.208
 and the walk-forward worsens 0.235 to 0.239. The odds gap to the leader is not a
 prior-strength issue, so the validated K=2 model stands.
+
+## v10 candidate, 2026-11-23 — matching the leader's evidence standard
+
+The #1 entry's dashboard (`kiencx`, 966,767) was read from its public cover. Its value
+model is the same size + category structure, but its evidence is presented more
+strongly: a cumulative term table, a shuffled-growth control, a farm view at 14/198
+worth, and a "refitted in this browser" checksum strip. Our model itself is at its
+ceiling: a category-prior sweep (K = 2..100) keeps K=20 as the best joint result (LOO
+3.405, WF 3.267; K=5 gives WF 3.001 but LOO 3.799), and excluding bridge/CEX/wrapped
+peers makes the walk-forward worse. The gap is methodology and presentation, not the
+prior.
+
+v10 changes (commit `41d044a`, branch `v10`):
+- The value table starts from the flat baseline and tests each term against the kept
+  model: size 3.44/3.39 kept, category 3.40/3.27 kept, growth 3.92/3.47, age
+  3.57/5.22, chain 3.85/3.81, and a five-shuffle growth control 3.52/3.39 that must
+  not help.
+- The farm verdict now requires odds >= 0.75 as well as net > the T-bill: 19 of 198
+  candidates are worth, 178 marginal, 1 skip. The planner's client-side recomputation
+  uses the same 0.75 bar.
+- The third screenshot is the filtered farm view (19 worth farms, odds 75-91%), not the
+  RWA category; the board, detail and planner screenshots were rebuilt.
+
+Gate: all local rows pass; two builds are byte-identical; source 65,535/65,536;
+dossier 1,433,997; screenshots 264,931 / 255,011 / 255,788 / 249,017 bytes. Not
+submitted yet: it awaits the v9c score and the next quota. The remaining leader
+features (browser refit/checksum, 0.02%-of-TVL sizing, rank range) need source trimming
+first; the one byte of headroom is the constraint.

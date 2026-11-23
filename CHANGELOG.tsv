@@ -12,3 +12,4 @@ date	iteration	commit	submission	change	judge_rate	rank	notes
 2026-11-23	v9	4689a8f147e72e9d70ac1605290f3fbaec0aa8e1	superseded	shrunk category effect on the value model; 2 kept terms, LOO 3.40x, WF 3.27x	none	none	superseded by v9c after review
 2026-11-23	v9c	4c46abf63ecd976d9567dbc7a51cd1904f02ff5f	pending	review fixes: expm1 category display, sandbox odds size, derived term flags; 2026-11-23 env-secret audit clean	pending	pending	scheduled 2026-11-24T00:00:30Z via submit-pick-v9c.sh; auto-pick only if >942846; v8b fallback
 2026-11-23	odds prior test	none	not adopted	K=5..40 category priors barely move top odds; 5f 0.208, WF 0.239	pending	pending	validated K=2 model stands
+2026-11-23	v10	41d044a9032d84e5e196828afed02bdfdebf6745	not submitted	cumulative value term tests + 5-shuffle growth control; farm verdict at odds>=0.75 (19/198); farm-verdict screenshot	pending	pending	candidate; gate passes 65,535/65,536; screenshots rebuilt; awaits v9c score and quota
