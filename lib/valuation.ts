@@ -421,7 +421,7 @@ const farmPlan = (p: Protocol, implied: number, age: number | null, candidate: b
   const name = clean(p.name, 50);
   const weekly = Math.max(0.5, gas / 4);
   const exit = Math.max(1, gas / 2);
-  const fees = round(gas * 2 + weekly * weeks + exit, 2);
+  const fees = round(gas * 3 + weekly * weeks + exit, 2);
   const hours = round((20 + 10 + 15 + 10 + weeks * 15 + 10 + 30) / 60, 1);
   const action = actionFor(p);
   const variant = (PLAN_VARIANT.find(([re]) => re.test(p.category ?? '')) ?? [null, GENERIC_VARIANT])[1]!;

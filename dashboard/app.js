@@ -659,24 +659,39 @@
     var horizon = Number($('#planHorizon').value) || 12;
     var risk = $('#planRisk').value;
     var owned = R.rows.filter(function (r) { return pins.has(r.slug); });
-    var chosen = owned.length ? owned : R.rows.filter(function (r) { return r.candidate && r.plan.verdict !== 'skip'; }).sort(function (a, b) { return b.plan.perHour - a.plan.perHour; }).slice(0, 6);
-    if (risk === 'worth') chosen = chosen.filter(function (r) { return r.plan.verdict === 'worth'; });
+    var pool = owned.length ? owned : R.rows.filter(function (r) { return r.candidate && r.plan.verdict !== 'skip'; }).sort(function (a, b) { return b.plan.perHour - a.plan.perHour; }).slice(0, 6);
+    if (risk === 'worth') {
+      var probe = budget / Math.max(1, pool.length);
+      for (var pass = 0; pass < 5; pass++) {
+        var kept = pool.filter(function (r) { return farm(r, probe, horizon).verdict === 'worth'; });
+        if (kept.length === 0) { pool = []; break; }
+        var next = budget / kept.length;
+        if (kept.length === pool.length && Math.abs(next - probe) < 1) { pool = kept; probe = next; break; }
+        pool = kept; probe = next;
+      }
+    }
     var host = $('#planBody');
     host.replaceChildren();
-    if (chosen.length === 0) {
-      host.appendChild(el('p', 'empty', owned.length ? 'No shortlisted row passes this filter. Widen it or star other rows.' : 'No candidate passes this filter. Lower the bar or switch the verdict.'));
+    if (pool.length === 0) {
+      host.appendChild(el('p', 'empty', owned.length ? 'No shortlisted row is worth farming at this budget. Raise the budget or widen the filter.' : 'No candidate is worth farming at this budget. Raise the budget or switch the verdict.'));
       return;
     }
-    var alloc = budget / chosen.length;
-    var rows = chosen.map(function (r) { return { r: r, f: farm(r, alloc, horizon) }; });
+    var alloc = budget / pool.length;
+    var rows = pool.map(function (r) { return { r: r, f: farm(r, alloc, horizon) }; });
+    if (risk === 'worth') {
+      rows = rows.filter(function (x) { return x.f.verdict === 'worth'; });
+      alloc = budget / Math.max(1, rows.length);
+      rows = rows.map(function (x) { return { r: x.r, f: farm(x.r, alloc, horizon) }; });
+    }
+    var chosen = rows.map(function (x) { return x.r; });
     var drop = rows.reduce(function (s, x) { return s + x.f.drop; }, 0);
     var fees = rows.reduce(function (s, x) { return s + x.f.fees; }, 0);
     var net = drop - fees;
     var bench = budget * 0.04 * horizon / 52;
-    var hours = Math.max.apply(null, chosen.map(function (r) { return r.plan.hours; }));
+    var hours = rows.reduce(function (s, x) { return s + x.r.plan.hours; }, 0);
     var verdict = net > bench ? 'worth' : net > 0 ? 'marginal' : 'skip';
     var totals = el('div', 'terms planTotals');
-    [['Budget', money(budget), chosen.length + ' protocols · ' + money(alloc) + ' each'], ['Drop', money(drop), '7% of implied × share'], ['Fees', money(fees), 'gas across the plan'], ['Net', money(net), verdict.toUpperCase()], ['T-bill', money(bench), horizon + ' weeks at 4%'], ['Net / hour', money(net / Math.max(0.1, hours)), 'parallel farm · ' + hours + ' h']].forEach(function (t) {
+    [['Budget', money(budget), chosen.length + ' protocols · ' + money(alloc) + ' each'], ['Drop', money(drop), '7% of implied × share'], ['Fees', money(fees), 'gas across the plan'], ['Net', money(net), verdict.toUpperCase()], ['T-bill', money(bench), horizon + ' weeks at 4%'], ['Net / hour', money(net / Math.max(0.1, hours)), 'sum of active hours · ' + hours.toFixed(1) + ' h']].forEach(function (t) {
       var d = el('div', 'term' + (t[0] === 'Net' ? ' result' : ''));
       d.appendChild(el('span', null, t[0]));
       d.appendChild(el('b', null, t[1]));
