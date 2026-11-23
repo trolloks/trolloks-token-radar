@@ -180,3 +180,16 @@ plausible (the CEX and bridge records still lead, so candidates are unaffected).
 
 Not adopted for v8b: the dashboard source is at the 65,536-byte cap and the gain is
 within noise. Keep as the v9 candidate if the final heat needs another entry.
+
+### v9, 2026-11-23 — staged on branch `v9-category`
+
+- Add a shrunk category effect (20 pseudo-protocols) on top of the size curve.
+- The category term improves both blind tests: leave-one-out 3.40x (from 3.44x) and
+  walk-forward 3.27x (from 3.39x). Two of five terms are kept, matching the leader's
+  two-term value model.
+- Implied values shift by the per-protocol category adjustment (Steakhouse +9%); the
+  detail page shows the adjustment and the sandbox reprices with it.
+- Gate: dashboard source 65,500 / 65,536; dossier 1,410,397; four 1280x1024 screenshots;
+  verify.mjs all pass. Bundle `radar-v9.tar.gz` checked (84.1% authored, 285 turns).
+- Commit `4689a8f` on `v9-category`; not submitted. v8b is scheduled for 00:00:30Z; v9 is
+  the next candidate once v8b is measured.
