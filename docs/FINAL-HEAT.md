@@ -53,9 +53,10 @@ entry.
 
 The dev rate is a screen, not the final score: the final heat re-judges every final entry
 afresh. The armed entries are close in quality; if the dev rates are within about 1,000,
-prefer the entry with the strongest dossier for the final (v11/v12: full source, browser
-refit/checksum, farm view; v5/v10 have the earlier presentation). The pick can be changed
-with `PUT final-entry` until 2026-12-14T10:00Z.
+prefer the entry with the strongest dossier for the final (v11: full source, browser
+refit/checksum, farm view, fixed $10K plans; v12 adds the 0.02%-of-TVL sizing and rank
+ranges but has a 0-skip farm view and $250K top plans; v5/v10 have the earlier
+presentation). The pick can be changed with `PUT final-entry` until 2026-12-14T10:00Z.
 
 ## Final heat
 
