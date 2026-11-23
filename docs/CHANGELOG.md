@@ -138,3 +138,13 @@ Rebuilt the model to the standard the leader's public artifact showed:
   1280x1024 screenshots; verify.mjs all pass.
 - Quota: today's 5 spent, 4 entries left in total. Submit v8 after 2026-11-24T00:00:00Z
   and keep v5 pinned until v8 is measured.
+
+## Final screening check, 2026-11-23 11:45 UTC
+
+- Leaderboard read with 17,723 rated entries.
+- Place-40 line (the 40th-best interval low): **943,891**.
+- v5 interval: **927,048 - 958,643**. Its high clears the line by 14,752, so v5 goes
+  on to the final heat (entries close 2026-12-14T10:00:00Z).
+- v5 low is below the paid-places line (10th-best low 949,612), but the final heat
+  re-judges every finalist afresh, so the dev point estimate is not the final result.
+- The line can rise as more entries arrive; monitor it before the deadline.
