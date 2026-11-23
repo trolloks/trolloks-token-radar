@@ -322,4 +322,22 @@ The codex's remaining criterion-2 note and the leader's farm/range presentation:
   a submit flag.
 - Commit `2f49c6e`; bundle `64e0c011...` (22,693,576 bytes); site check overall true,
   85.5% authored (2,219/2,593); scheduled 2026-11-24T00:15:30Z; scheduler PID 1517436.
-  This is the last quota entry.
+  The v13 uses the freed v10 slot.
+
+## v13 candidate, 2026-11-23 — minimum-viable plans and cover checks
+
+The dev top-10 board (cutoff 96.2052%; v5 at 94.2846%) shows the remaining gaps; with the
+v10 slot freed, v13 targets the two most common top-10 features that fit the tight
+source/dossier cap:
+- Each farm plan is the minimum viable capital: the smallest position whose modelled drop
+  clears the 4% T-bill after fees, with a 10% margin, a $5K floor and a $250K cap; when
+  no size clears the hurdle it falls back to 0.02% of TVL. Farm counts 19 worth / 179
+  marginal / 0 skip. Loopscale Lending is $5,000 with $49 net / $19 per hour; the detail's
+  sensitivity table sorts the plan row in place.
+- The cover ledger carries the gate evidence: source 65,259/65,536, 4 screenshots and
+  gate PASS, beside the refit 6.744/-0.465 and checksum FF5DC75C.
+- Source 65,259/65,536; dossier 65,528/65,536; gate all PASS; two builds byte-identical;
+  screenshots rebuilt (the detail is a worth row, Loopscale).
+- Commit `89f8153`; bundle `6ea4ac7c...` (23,639,952 bytes); site check overall true,
+  85.7% authored (2,238/2,610); title 175 chars; scheduled 2026-11-24T00:25:30Z, after
+  v12; scheduler PID 1560552; picks at 01:45Z.
