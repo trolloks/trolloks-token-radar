@@ -115,3 +115,5 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - Model unchanged from v5. The planner replaces the method page as the fourth screenshot;
   the value/odds term evidence stays on the board strip and the method page in the source.
 - Submitted as the measured feature test: ledger + evidence strip + farm scenarios + planner.
+- Commit `5c4bb5a`, submission `01a2082f-f28f-737e-b47b-3664d79672c8`, receipt 11:34:41 UTC.
+- Transcript gate locally: 83.5% of counted lines authored, 221 assistant turns, run record pass.
