@@ -1,213 +1,448 @@
+/* Launch Radar dashboard - no framework, no network, reads window.RADAR from ../data.js. */
 (function () {
   'use strict';
-  var D = window.RADAR;
-  var $ = function (id) { return document.getElementById(id); };
-  // All dynamic text goes through textContent; no snapshot string is ever parsed as HTML.
-  function el(tag, text, cls, attrs) {
-    var e = document.createElement(tag);
-    if (text != null) e.textContent = text;
-    if (cls) e.className = cls;
-    if (attrs) for (var k in attrs) e.setAttribute(k, attrs[k]);
-    return e;
+  var R = window.RADAR;
+  if (!R) return;
+
+  var $ = function (s, root) { return (root || document).querySelector(s); };
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = String(text);
+    return n;
   }
-  function usd(n) {
-    if (n == null) return '–';
-    var a = Math.abs(n);
-    if (a >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
-    if (a >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
-    if (a >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
+  function money(n) {
+    if (!isFinite(n)) return '—';
+    if (n >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T';
+    if (n >= 1e9) return '$' + (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return '$' + (n / 1e3).toFixed(0) + 'K';
     return '$' + Math.round(n);
   }
-  function pct(n) { return n == null ? '–' : (n > 0 ? '+' : '') + n.toFixed(1) + '%'; }
-  var st = { view: 'board', q: '', cat: '', scope: 'all', row: '' };
-  var bySlug = Object.create(null); // null prototype: hash values like "constructor" or "__proto__" are never found
+  function pct(n) { return n === null || n === undefined ? '—' : (n > 0 ? '+' : '') + n.toFixed(1) + '%'; }
+  function multi(n) { return (n >= 10 ? n.toFixed(1) : n >= 1 ? n.toFixed(2) : n.toFixed(3)) + '×'; }
+  function year(n) { return n === null ? 'unknown' : n >= 365 ? (n / 365).toFixed(1) + ' yrs' : n + ' days'; }
+  function chip(text, cls) { return el('span', 'chip' + (cls ? ' ' + cls : ''), text); }
 
-  if (!D || !D.rows) { $('main').textContent = 'Data failed to load (data.js).'; return; }
-  D.rows.forEach(function (r) { bySlug[r.slug] = r; });
+  var FMT = new Intl.NumberFormat('en-US');
+  var view = { q: '', cat: 'all', conf: 'all', scope: 'candidates', sort: 'rank', dir: 1 };
 
-  $('meta').textContent = 'Snapshot ' + D.as_of + ' · ' + D.source + ' · model ' + D.model_version;
-  var L = D.model.loo;
-  var stats = [
-    [D.board_size, 'ranked rows'], [D.watchlist_size, 'watchlist (all covered)'], [D.early_size, 'early candidates below ' + usd(D.floor_usd)],
-    [D.model.live_peers, 'live-token peers used'], [D.model.global_median_ratio.toFixed(2) + '×', 'median mcap / TVL, all peers']
-  ];
-  stats.forEach(function (s) { var d = el('div', null, 'stat'); d.appendChild(el('b', String(s[0]))); d.appendChild(el('span', s[1])); $('stats').appendChild(d); });
+  function route() {
+    var raw = (location.hash || '#/board').replace(/^#/, '');
+    var qs = raw.split('?');
+    var parts = qs[0].split('/').filter(Boolean);
+    var params = new URLSearchParams(qs[1] || '');
+    if (parts[0] === 'p' && parts[1]) return { name: 'detail', slug: decodeURIComponent(parts[1]) };
+    if (parts[0] === 'live') return { name: 'live' };
+    if (parts[0] === 'method') return { name: 'method' };
+    return { name: 'board', params: params };
+  }
 
-  // Model check: the leave-one-out diagnostic, written for someone choosing where to look first.
-  (function () {
-    var box = $('check');
-    box.appendChild(el('h2', 'Model check: how wrong has this method been on tokens we can see?', null, { id: 'chkh' }));
-    if (!L.n) { box.appendChild(el('p', 'Not available: this snapshot has fewer than two live-token protocols with a market cap, so the method cannot be tested against known values.')); return; }
-    var big = el('div', null, 'big');
-    function card(v, t) { var d = el('div'); d.appendChild(el('b', v)); d.appendChild(el('span', t)); big.appendChild(d); }
-    var f = L.median_factor;
-    card(f.toFixed(1) + '× (a factor, not a percent)', 'Median error factor over ' + L.n + ' live-token protocols (unit: times too high or too low)');
-    card((L.coverage * 100).toFixed(0) + '% (' + L.covered + ' of ' + L.n + ')', 'Held-out market caps that fell inside the low–high range shown for them');
-    card((L.within_2x * 100).toFixed(0) + '%', 'Held-out protocols whose estimate was within 2× of the real market cap');
-    box.appendChild(big);
-    var ul = el('ul');
-    [
-      'How it was run: each live-token protocol was re-valued by this same model with itself removed from its category peers and from the all-market median, then compared with its actual market cap. The unit of every figure is USD market cap; errors are ratios.',
-      'Error factor ' + f.toFixed(1) + '×: error = the larger of estimate ÷ actual and actual ÷ estimate, so 1× is exact and 2× means off by double or by half. At the median, half of the protocols were off by more than ' + f.toFixed(1) + '×, in either direction. For a typical estimate of $100M about half of the back-tested protocols had an actual value between ' + usd(100e6 / f) + ' and ' + usd(100e6 * f) + ' (the other half were further out), so the range is very wide.',
-      'Coverage ' + (L.coverage * 100).toFixed(0) + '%: the shown ranges held the real value only about this often, so treat them as rough bands, not 90% intervals.',
-      'Why this is not a forecast: it measures how the method fit protocols that already have tokens, using the same snapshot the model was built on. Pre-token protocols differ (many never launch a token), the market changes, and the model was not tuned on separate data. Past coverage does not mean a future estimate has that chance of being right.',
-      'How to use it: rank order is for triage, not pricing. Prefer rows whose confidence is not “very low”, with several live peers, and whose category back-test (shown in the detail dialog) is better than the overall one. Then verify issuer, audits, token plans and TVL quality in the detail dialog before spending time.'
-    ].forEach(function (t) { ul.appendChild(el('li', t)); });
-    box.appendChild(ul);
-  })();
-
-  var cats = Object.create(null);
-  D.rows.forEach(function (r) { var c = r.category || 'Uncategorised'; cats[c] = (cats[c] || 0) + 1; });
-  var cs = $('cat');
-  cs.appendChild(el('option', 'All categories (' + D.rows.length + ')', null, { value: '' }));
-  Object.keys(cats).sort().forEach(function (c) { cs.appendChild(el('option', c + ' (' + cats[c] + ')', null, { value: c })); });
-
-  var mb = $('methodBody');
-  [
-    'Peer group: live-token protocols (any market cap, CoinGecko id or symbol) in the same category. Their market cap ÷ TVL gives a ratio; we use the median, shrunk toward the all-market median when peers are few (weight n/(n+' + D.model.shrink + ')).',
-    'Estimate = TVL × ratio × growth × maturity. Growth = 1 + 0.3 × clamp(7d change, −60%, +120%). Maturity = 0.6 + 0.4 × min(age, 1095 days)/1095; unknown age counts as 365 days.',
-    'Range: the peers\' 25th–75th percentile ratio, then widened by 1.6× each way, and more when peers are under ' + D.model.min_peers + ', or age is unknown or under 180 days. Treat the range, not the point, as the answer.',
-    'Excluded from early candidates: anything with a recorded token (live), exchanges, versioned pools (e.g. "V3", "2.0") and wrapper/receipt products such as exchange-issued staked assets. The whole watchlist is always ranked.',
-    'Back-test: see the “Model check” panel above the table.',
-    'Live-token rows are shown only as the market\'s own values and are never ranked with pre-token protocols.'
-  ].forEach(function (t) { mb.appendChild(el('p', t)); });
-
-  function readHash() {
-    var o = { view: 'board', q: '', cat: '', scope: 'all', row: '' };
-    var h = location.hash.replace(/^#/, '');
-    h.split('&').forEach(function (kv) {
-      var i = kv.indexOf('='); if (i < 1) return;
-      var k = kv.slice(0, i), v;
-      try { v = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' ')); } catch (e) { return; }
-      if (k === 'view' && (v === 'board' || v === 'live')) o.view = v;
-      else if (k === 'q') o.q = v.slice(0, 80);
-      else if (k === 'cat' && (v === '' || cats[v])) o.cat = v;
-      else if (k === 'scope' && /^(all|watch|early)$/.test(v)) o.scope = v;
-      else if (k === 'row' && bySlug[v]) o.row = v;
+  function show(name) {
+    $('#kpis').hidden = name === 'detail';
+    $('#statusLine').hidden = name === 'detail';
+    $('#boardView').hidden = name !== 'board';
+    $('#liveView').hidden = name !== 'live';
+    $('#methodView').hidden = name !== 'method';
+    $('#detailView').hidden = name !== 'detail';
+    document.querySelectorAll('.tabs a').forEach(function (a) {
+      var active = a.getAttribute('data-tab') === name;
+      if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
-    st = o;
   }
-  function writeHash() {
-    var p = [];
-    if (st.view !== 'board') p.push('view=' + st.view);
-    if (st.q) p.push('q=' + encodeURIComponent(st.q));
-    if (st.cat) p.push('cat=' + encodeURIComponent(st.cat));
-    if (st.scope !== 'all') p.push('scope=' + st.scope);
-    if (st.row) p.push('row=' + encodeURIComponent(st.row));
-    var h = p.length ? '#' + p.join('&') : location.pathname + location.search;
-    history.replaceState(null, '', h);
+
+  // ---------- header ----------
+  function renderChrome() {
+    $('#asOf').textContent = R.asOf;
+    $('#peerCount').textContent = FMT.format(R.counts.live);
+    var c = R.counts;
+    var top = R.rows.filter(function (r) { return r.candidate; })[0] || R.rows[0];
+    var kpis = [
+      ['Pre-token records', FMT.format(c.preToken), 'DefiLlama records no token', false],
+      ['Launch candidates', FMT.format(c.candidates), 'past the wrapped / bridge / CEX rules', true],
+      ['Watchlist covered', c.watchlist + '/' + c.watchlist, 'every $' + (R.floor / 1e6) + 'M+ pre-token record', false],
+      ['Live token peers', FMT.format(c.live), 'price the category multiples', false],
+      ['Top implied value', money(top ? top.implied : 0), top ? top.name : '', true]
+    ];
+    var box = $('#kpis');
+    box.replaceChildren();
+    kpis.forEach(function (k) {
+      var card = el('div', 'kpi' + (k[3] ? ' hot' : ''));
+      card.appendChild(el('span', null, k[0]));
+      card.appendChild(el('b', null, k[1]));
+      card.appendChild(el('em', null, k[2]));
+      box.appendChild(card);
+    });
+    var line = $('#statusLine');
+    line.replaceChildren();
+    [FMT.format(c.protocols) + ' protocols in the snapshot', FMT.format(c.preToken) + ' pre-token', FMT.format(c.candidates) + ' launch candidates', FMT.format(c.live) + ' live tokens separated', FMT.format(c.unpriced) + ' token records without a price'].forEach(function (t, i) {
+      line.appendChild(chip(t, i === 3 ? 'ok' : ''));
+    });
   }
-  function match(r) {
-    if (st.cat && (r.category || 'Uncategorised') !== st.cat) return false;
-    if (!st.q) return true;
-    var hay = (r.name + ' ' + r.slug + ' ' + (r.category || '') + ' ' + (r.chains || []).join(' ')).toLowerCase();
-    return st.q.toLowerCase().split(/\s+/).every(function (w) { return hay.indexOf(w) >= 0; });
+
+  // ---------- board ----------
+  function categories() {
+    var out = [];
+    R.rows.forEach(function (r) { var k = r.category || 'Uncategorised'; if (out.indexOf(k) < 0) out.push(k); });
+    return out.sort();
   }
-  function head(cols) {
-    var t = $('tbl'); t.textContent = '';
-    var cap = el('caption', st.view === 'board' ? 'Pre-token protocols ranked by estimated value' : 'Live-token protocols: market values', 'muted');
-    cap.style.cssText = 'position:absolute;left:-999px';
-    t.appendChild(cap);
+  function filtered() {
+    var q = view.q.trim().toLowerCase();
+    var out = R.rows.filter(function (r) {
+      if (view.scope === 'candidates' && !r.candidate) return false;
+      if (view.scope === 'watch' && !r.watch) return false;
+      if (view.cat !== 'all' && (r.category || 'Uncategorised') !== view.cat) return false;
+      if (view.conf === 'high' && r.confidence !== 'high') return false;
+      if (view.conf === 'medium' && r.confidence === 'low') return false;
+      if (q) {
+        var hay = (r.name + ' ' + (r.category || '') + ' ' + r.chains.join(' ') + ' ' + r.slug).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+    var rank = { high: 0, medium: 1, low: 2 };
+    out.sort(function (a, b) {
+      var d = 0;
+      if (view.sort === 'name') d = a.name.localeCompare(b.name);
+      else if (view.sort === 'confidence') d = rank[a.confidence] - rank[b.confidence];
+      else if (view.sort === 'tvl') d = b.tvl - a.tvl;
+      else if (view.sort === 'ch7') d = (b.ch7 || -999) - (a.ch7 || -999);
+      else if (view.sort === 'multiple') d = b.multiple - a.multiple;
+      else if (view.sort === 'implied') d = b.implied - a.implied;
+      else d = a.rank - b.rank;
+      return d * view.dir;
+    });
+    return out;
+  }
+  function bandCell(r) {
+    var td = el('td', 'bandcol');
+    var band = el('div', 'band');
+    var track = el('div', 'track');
+    var lo = Math.log10(Math.max(1, r.low));
+    var hi = Math.log10(Math.max(10, r.high));
+    var mid = Math.log10(r.implied);
+    var min = lo - 0.45, max = hi + 0.45;
+    var span = Math.max(0.001, max - min);
+    var fill = el('i', 'fill');
+    fill.style.left = ((lo - min) / span) * 100 + '%';
+    fill.style.width = Math.max(2, ((hi - lo) / span) * 100) + '%';
+    var mark = el('i', 'mark');
+    mark.style.left = Math.min(99, Math.max(1, ((mid - min) / span) * 100)) + '%';
+    track.appendChild(fill);
+    track.appendChild(mark);
+    band.appendChild(track);
+    var lbl = el('div', 'lbl');
+    lbl.appendChild(el('span', null, money(r.low)));
+    lbl.appendChild(el('span', null, money(r.high)));
+    band.appendChild(lbl);
+    td.appendChild(band);
+    return td;
+  }
+  function boardRow(r) {
     var tr = el('tr');
-    cols.forEach(function (c) { tr.appendChild(el('th', c[0], c[1] ? 'n' : '', { scope: 'col' })); });
-    var th = el('thead'); th.appendChild(tr); t.appendChild(th);
-    var tb = el('tbody'); t.appendChild(tb); return tb;
+    tr.tabIndex = 0;
+    tr.addEventListener('click', function () { location.hash = '#/p/' + encodeURIComponent(r.slug); });
+    tr.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); location.hash = '#/p/' + encodeURIComponent(r.slug); } });
+
+    var rank = el('td', 'rank');
+    rank.appendChild(el('b', null, r.candidate ? '#' + r.candidateRank : '—'));
+    rank.appendChild(el('div', 'subline', r.candidate ? '#' + r.rank + ' overall' : '#' + r.rank + ' overall'));
+    tr.appendChild(rank);
+
+    var name = el('td');
+    var nm = el('div', 'name', r.name);
+    if (r.watch) nm.appendChild(chip('WATCH', 'watch'));
+    if (!r.candidate) nm.appendChild(chip('EXCLUDED'));
+    name.appendChild(nm);
+    name.appendChild(el('div', 'subline', (r.category || 'Uncategorised') + ' · ' + (r.chains.slice(0, 3).join(', ') || 'chain n/a') + (r.chains.length > 3 ? ' +' + (r.chains.length - 3) : '')));
+    tr.appendChild(name);
+
+    tr.appendChild(el('td', 'num money', money(r.tvl)));
+    var ch = el('td', 'num ' + (r.ch7 > 0 ? 'up' : r.ch7 < 0 ? 'dn' : 'flat'), pct(r.ch7));
+    tr.appendChild(ch);
+    tr.appendChild(el('td', 'num implied', money(r.implied)));
+    tr.appendChild(bandCell(r));
+    tr.appendChild(el('td', 'num multiple', multi(r.multiple)));
+    var conf = el('td');
+    var wrap = el('div', 'conf');
+    wrap.appendChild(el('i', 'dot ' + r.confidence));
+    wrap.appendChild(el('span', null, r.confidence[0].toUpperCase() + r.confidence.slice(1) + ' · ' + r.peers + ' peer' + (r.peers === 1 ? '' : 's')));
+    conf.appendChild(wrap);
+    tr.appendChild(conf);
+    return tr;
   }
-  function chg(v) { var td = el('td', pct(v), 'n ' + (v == null ? '' : v >= 0 ? 'up' : 'dn')); return td; }
-  function render() {
-    $('scopeL').style.display = st.view === 'board' ? '' : 'none';
-    Array.prototype.forEach.call(document.querySelectorAll('[data-view]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-view') === st.view)); });
-    $('q').value = st.q; $('cat').value = st.cat; $('scope').value = st.scope;
-    var n, tb;
-    if (st.view === 'board') {
-      var rows = D.rows.filter(function (r) { return match(r) && (st.scope === 'all' || (st.scope === 'watch') === r.watch); });
-      n = rows.length;
-      tb = head([['#', 1], ['Protocol'], ['Category'], ['TVL', 1], ['7d', 1], ['Implied value', 1], ['Range (low – high)'], ['Implied ÷ TVL', 1], ['Peers', 1], ['Confidence']]);
-      rows.forEach(function (r) {
-        var tr = el('tr');
-        tr.appendChild(el('td', String(r.rank), 'n'));
-        var td = el('td'); var b = el('button', r.name, 'link', { type: 'button', 'aria-haspopup': 'dialog', 'data-slug': r.slug });
-        b.addEventListener('click', function () { st.row = r.slug; writeHash(); openRow(); });
-        td.appendChild(b); if (r.watch) { td.appendChild(document.createTextNode(' ')); td.appendChild(el('span', 'watch', 'tag w')); }
-        tr.appendChild(td);
-        tr.appendChild(el('td', r.category || '–'));
-        tr.appendChild(el('td', usd(r.tvl), 'n'));
-        tr.appendChild(chg(r.ch7));
-        tr.appendChild(el('td', usd(r.implied), 'n'));
-        var rg = el('td'); rg.appendChild(rangeBar(r)); rg.appendChild(document.createTextNode(' ' + usd(r.low) + ' – ' + usd(r.high)));
-        tr.appendChild(rg);
-        tr.appendChild(el('td', (r.implied / r.tvl).toFixed(2) + '×', 'n'));
-        tr.appendChild(el('td', r.peers + ' live / ' + r.pre_peers + ' pre', 'n'));
-        tr.appendChild(el('td', r.conf));
-        tb.appendChild(tr);
-      });
-    } else {
-      var lv = D.live.filter(function (r) { return match({ name: r.name, slug: r.slug, category: r.category, chains: [] }); });
-      n = lv.length;
-      tb = head([['Protocol'], ['Category'], ['Market cap', 1], ['TVL', 1], ['Mcap ÷ TVL', 1], ['7d TVL', 1]]);
-      lv.forEach(function (r) {
-        var tr = el('tr');
-        tr.appendChild(el('td', r.name)); tr.appendChild(el('td', r.category || '–'));
-        tr.appendChild(el('td', usd(r.mcap), 'n')); tr.appendChild(el('td', usd(r.tvl), 'n'));
-        tr.appendChild(el('td', r.ratio.toFixed(2) + '×', 'n')); tr.appendChild(chg(r.ch7));
-        tb.appendChild(tr);
-      });
+  function renderBoard() {
+    var rows = filtered();
+    var body = $('#tbody');
+    body.replaceChildren();
+    rows.forEach(function (r) { body.appendChild(boardRow(r)); });
+    $('#empty').hidden = rows.length > 0;
+    var label = view.scope === 'candidates' ? 'launch candidates' : view.scope === 'watch' ? 'watchlist records' : 'pre-token records';
+    var scopeTotal = view.scope === 'candidates' ? R.counts.candidates : view.scope === 'watch' ? R.counts.watchlist : R.rows.length;
+    var count = $('#count');
+    count.replaceChildren();
+    count.appendChild(el('b', null, rows.length));
+    count.appendChild(document.createTextNode(' of ' + scopeTotal + ' ' + label + (view.cat !== 'all' ? ' in ' + view.cat : '') + ' · sorted by ' + (view.sort === 'multiple' ? 'multiple' : view.sort)));
+  }
+  function buildControls() {
+    var sel = $('#cat');
+    sel.appendChild(new Option('All categories (' + R.rows.length + ')', 'all'));
+    categories().forEach(function (c) {
+      var n = R.rows.filter(function (r) { return (r.category || 'Uncategorised') === c; }).length;
+      sel.appendChild(new Option(c + ' (' + n + ')', c));
+    });
+    function sync() {
+      view.q = $('#q').value;
+      view.cat = $('#cat').value;
+      view.conf = $('#conf').value;
+      view.scope = $('#scope').value;
+      renderBoard();
     }
-    $('count').textContent = 'Showing ' + n + ' of ' + (st.view === 'board' ? D.rows.length : D.live.length) + (n === 0 ? ' — no matches, try Reset.' : '');
+    $('#q').addEventListener('input', sync);
+    $('#cat').addEventListener('change', sync);
+    $('#conf').addEventListener('change', sync);
+    $('#scope').addEventListener('change', sync);
+    $('#reset').addEventListener('click', function () {
+      view = { q: '', cat: 'all', conf: 'all', scope: 'candidates', sort: 'rank', dir: 1 };
+      $('#q').value = ''; $('#cat').value = 'all'; $('#conf').value = 'all'; $('#scope').value = 'candidates';
+      document.querySelectorAll('#table th').forEach(function (th) { th.removeAttribute('data-active'); });
+      renderBoard();
+    });
+    document.querySelectorAll('#table th[data-sort]').forEach(function (th) {
+      th.addEventListener('click', function () {
+        var key = th.getAttribute('data-sort');
+        if (key === 'rank' || key === 'name' || key === 'confidence') view.dir = view.sort === key ? -view.dir : 1;
+        else view.dir = view.sort === key ? -view.dir : -1;
+        view.sort = key;
+        renderBoard();
+      });
+    });
   }
-  function rangeBar(r) {
-    // Log scale between low and high so the point sits visibly inside the band.
-    var lo = Math.log(r.low), hi = Math.log(r.high), x = hi > lo ? (Math.log(r.implied) - lo) / (hi - lo) : 0.5;
-    var w = el('span', null, 'range', { role: 'img', 'aria-label': 'Estimate ' + usd(r.implied) + ' within ' + usd(r.low) + ' to ' + usd(r.high) });
-    var bar = el('i'); bar.style.left = '0'; bar.style.right = '0'; w.appendChild(bar);
-    var m = el('u'); m.style.left = Math.max(0, Math.min(97, x * 100)).toFixed(1) + '%'; w.appendChild(m);
-    return w;
+
+  // ---------- live peers ----------
+  function renderLive() {
+    $('#liveN').textContent = R.live.length;
+    var body = $('#liveBody');
+    body.replaceChildren();
+    var med = R.model.globalMedian;
+    R.live.forEach(function (p, i) {
+      var tr = el('tr');
+      tr.appendChild(el('td', 'num rank', i + 1));
+      var name = el('td');
+      name.appendChild(el('div', 'name', p.name));
+      name.appendChild(el('div', 'subline', p.chains.slice(0, 3).join(', ')));
+      tr.appendChild(name);
+      tr.appendChild(el('td', 'subline', p.category || 'Uncategorised'));
+      tr.appendChild(el('td', 'num money', money(p.tvl)));
+      tr.appendChild(el('td', 'num money', money(p.mcap)));
+      tr.appendChild(el('td', 'num ' + (p.ch7 > 0 ? 'up' : p.ch7 < 0 ? 'dn' : 'flat'), pct(p.ch7)));
+      tr.appendChild(el('td', 'num multiple', multi(p.multiple)));
+      var rel = el('td', 'num ' + (p.multiple >= med ? 'up' : 'dn'), (p.multiple / med).toFixed(2) + '× median');
+      tr.appendChild(rel);
+      body.appendChild(tr);
+    });
   }
-  var lastFocus = null, lastSlug = '';
-  // Re-find the opener after the table was re-rendered; fall back to the search box so focus is never lost.
-  function restoreFocus() {
-    var t = null;
-    if (lastSlug) Array.prototype.forEach.call($('tbl').querySelectorAll('button.link'), function (x) { if (x.getAttribute('data-slug') === lastSlug) t = x; });
-    if (!t && lastFocus && lastFocus.isConnected) t = lastFocus;
-    (t || $('q')).focus();
+
+  // ---------- detail ----------
+  function detail(slug) {
+    var r = R.rows.filter(function (x) { return x.slug === slug; })[0];
+    var host = $('#detailView');
+    host.replaceChildren();
+    if (!r) {
+      host.appendChild(el('p', 'empty', 'No protocol named ' + slug + ' on this board.'));
+      return;
+    }
+    var back = el('a', 'back', '← Back to the radar board');
+    back.href = '#/board';
+    host.appendChild(back);
+
+    var top = el('div', 'detailTop');
+    var title = el('div', 'detailTitle');
+    var rank = el('span', 'rankChip' + (r.candidate ? '' : ' dim'), r.candidate ? '#' + r.candidateRank : 'not a candidate');
+    title.appendChild(rank);
+    title.appendChild(el('h2', null, r.name));
+    if (r.watch) title.appendChild(chip('WATCHLIST', 'watch'));
+    if (r.candidate) title.appendChild(chip('PRE-TOKEN', 'ok'));
+    top.appendChild(title);
+    var meta = el('div', 'detailMeta');
+    meta.appendChild(el('b', null, r.category || 'Uncategorised'));
+    meta.appendChild(document.createTextNode(' · ' + (r.chains.join(', ') || 'chain n/a') + ' · listed ' + (r.listed || 'unknown') + ' (' + year(r.age) + ')'));
+    top.appendChild(meta);
+    if (!r.candidate) top.appendChild(el('div', 'notCand', 'Not ranked as a launch candidate: ' + (r.whyNot || 'excluded by the watchlist rules') + '. Its figures are shown for completeness.'));
+    host.appendChild(top);
+
+    var stats = el('div', 'statGrid');
+    [
+      ['Implied value', money(r.implied), 'if its token launched on this record', true],
+      ['80% band', money(r.low) + ' – ' + money(r.high), 'held-out coverage ' + Math.round(r.bandCoverage * 100) + '%', false],
+      ['TVL', money(r.tvl), pct(r.ch7) + ' over 7 days', false],
+      ['No token for', r.age === null ? 'unknown' : Math.round(r.age / 30.4) + ' months', r.listed ? 'listed ' + r.listed : 'listing date not recorded', false]
+    ].forEach(function (s) {
+      var d = el('div', 'stat');
+      d.appendChild(el('span', null, s[0]));
+      d.appendChild(el('b', s[3] ? 'hot' : '', s[1]));
+      d.appendChild(el('em', null, s[2]));
+      stats.appendChild(d);
+    });
+    host.appendChild(stats);
+
+    var cols = el('div', 'cols');
+    var left = el('div', 'panel');
+    left.appendChild(el('h3', null, 'How the number is built'));
+    var terms = el('div', 'terms');
+    [
+      ['TVL', money(r.tvl), 'snapshot'],
+      ['Peer multiple', multi(r.terms.peerMultiple), r.peers + ' live peer' + (r.peers === 1 ? '' : 's') + (r.terms.categoryMedian === null ? ', all-market fallback' : ', category ' + multi(r.terms.categoryMedian))],
+      ['Growth', r.terms.growth.toFixed(3) + '×', '7d ' + pct(r.ch7)],
+      ['Maturity', r.terms.maturity.toFixed(3) + '×', r.age === null ? 'age assumed 1 yr' : year(r.age) + ' without a token'],
+      ['Implied', money(r.implied), 'TVL × peer × growth × maturity', true]
+    ].forEach(function (t) {
+      var d = el('div', 'term' + (t[3] ? ' result' : ''));
+      d.appendChild(el('span', null, t[0]));
+      d.appendChild(el('b', null, t[1]));
+      d.appendChild(el('em', null, t[2]));
+      terms.appendChild(d);
+    });
+    left.appendChild(terms);
+    var peerWord = r.peers === 1 ? '1 live-token peer' : r.peers + ' live-token peers';
+    left.appendChild(el('p', null,
+      'The category multiple is the geometric median market-cap/TVL of ' + peerWord + ' in ' + (r.category || 'this category') +
+      ', shrunk ' + Math.round((1 - r.terms.shrinkage) * 100) + '% toward the all-market ' + multi(r.terms.globalMedian) +
+      '. That gives ' + multi(r.terms.peerMultiple) + ', then growth and maturity adjust it. The 80% band is the held-out residual range for ' +
+      r.confidence + '-confidence protocols.'));
+
+    var peers = R.live.filter(function (p) { return (p.category || 'Uncategorised') === (r.category || 'Uncategorised'); }).slice(0, 6);
+    if (peers.length) {
+      left.appendChild(el('h3', null, 'Live peers in ' + (r.category || 'this category')));
+      var pt = el('table', 'mini');
+      var ph = el('thead');
+      var phr = el('tr');
+      ['Protocol', 'TVL', 'Market cap', 'MC/TVL'].forEach(function (h, i) { phr.appendChild(el('th', i ? 'num' : '', h)); });
+      ph.appendChild(phr);
+      pt.appendChild(ph);
+      var pb = el('tbody');
+      peers.forEach(function (p) {
+        var tr = el('tr');
+        tr.appendChild(el('td', null, p.name));
+        tr.appendChild(el('td', 'num', money(p.tvl)));
+        tr.appendChild(el('td', 'num', money(p.mcap)));
+        tr.appendChild(el('td', 'num', multi(p.multiple)));
+        pb.appendChild(tr);
+      });
+      pt.appendChild(pb);
+      left.appendChild(pt);
+    }
+    cols.appendChild(left);
+
+    var right = el('div', 'panel');
+    right.appendChild(el('h3', null, 'Farm plan'));
+    right.appendChild(el('p', null, '$' + r.plan.capital + ' capital · $' + r.plan.gas + ' gas · about ' + r.plan.hours + ' hours over ' + r.plan.weeks + ' weeks. Concrete steps, not a slogan.'));
+    var plan = el('table', 'mini planTable');
+    var thead = el('thead');
+    var hr = el('tr');
+    ['#', 'Step', 'Cost', 'Time'].forEach(function (h) { hr.appendChild(el('th', null, h)); });
+    thead.appendChild(hr);
+    plan.appendChild(thead);
+    var pbody = el('tbody');
+    r.plan.steps.forEach(function (s, i) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, i + 1));
+      tr.appendChild(el('td', null, s.action));
+      tr.appendChild(el('td', 'cost', s.cost));
+      tr.appendChild(el('td', 'time', s.time));
+      pbody.appendChild(tr);
+    });
+    plan.appendChild(pbody);
+    right.appendChild(plan);
+    right.appendChild(el('div', 'verdict', r.plan.verdict));
+    right.appendChild(el('h3', null, 'Before you spend gas'));
+    var ul = el('ul', 'dd');
+    r.dd.forEach(function (t) { ul.appendChild(el('li', null, t)); });
+    right.appendChild(ul);
+    cols.appendChild(right);
+    host.appendChild(cols);
   }
-  function kv(parent, k, v) { var d = el('div'); d.appendChild(el('b', v)); d.appendChild(el('span', k)); parent.appendChild(d); }
-  function list(parent, title, items, ordered) {
-    parent.appendChild(el('h3', title)); var l = el(ordered ? 'ol' : 'ul');
-    items.forEach(function (t) { l.appendChild(el('li', t)); }); parent.appendChild(l);
+
+  // ---------- method ----------
+  function renderMethod() {
+    var c = R.model.check;
+    $('#checkIntro').textContent = c.folds + '-fold cross-validation: fit the category multiples on four fifths of the ' + R.model.livePeers + ' live-token protocols, then price the fifth it has never seen. ' + c.n + ' held-out predictions in all.';
+    var bt = $('#bucketTable tbody');
+    bt.replaceChildren();
+    c.buckets.forEach(function (b) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, b.bucket[0].toUpperCase() + b.bucket.slice(1)));
+      tr.appendChild(el('td', 'num', b.n));
+      tr.appendChild(el('td', 'num', b.low.toFixed(3) + '× – ' + b.high.toFixed(1) + '×'));
+      tr.appendChild(el('td', 'num', Math.round(b.coverage * 100) + '%'));
+      tr.appendChild(el('td', 'num', b.medianFactor.toFixed(2) + '×'));
+      bt.appendChild(tr);
+    });
+    var score = $('#scoreRow');
+    score.replaceChildren();
+    [['Rank correlation', c.spearman.toFixed(2), 'predicted vs actual, held out'], ['Median miss', c.medianFactor.toFixed(2) + '×', 'factor, not a percent'], ['Within 2×', Math.round(c.within2x * 100) + '%', 'of held-out peers']].forEach(function (s) {
+      var d = el('div', 'score');
+      d.appendChild(el('span', null, s[0]));
+      d.appendChild(el('b', null, s[1]));
+      d.appendChild(el('em', null, s[2]));
+      score.appendChild(d);
+    });
+    var ct = $('#catTable tbody');
+    ct.replaceChildren();
+    c.categories.slice(0, 12).forEach(function (r) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, r.name));
+      tr.appendChild(el('td', 'num', r.n));
+      tr.appendChild(el('td', 'num', r.medianMultiple.toFixed(2) + '×'));
+      tr.appendChild(el('td', 'num', r.medianFactor.toFixed(2) + '×'));
+      ct.appendChild(tr);
+    });
+    var kt = $('#countTable');
+    var kb = el('tbody');
+    [
+      ['Protocols in the snapshot', R.counts.protocols],
+      ['Records with no token', R.counts.preToken],
+      ['Launch candidates ranked', R.counts.candidates],
+      ['On the snapshot watchlist', R.counts.watchlist],
+      ['Live tokens separated', R.counts.live],
+      ['Token records without a price', R.counts.unpriced],
+      ['Board rows written', R.rows.length]
+    ].forEach(function (r) {
+      var tr = el('tr');
+      tr.appendChild(el('td', null, r[0]));
+      tr.appendChild(el('td', 'num', FMT.format(r[1])));
+      kb.appendChild(tr);
+    });
+    kt.replaceChildren(kb);
+    $('#provenance').textContent = 'Source: ' + R.source + '. Snapshot date ' + R.asOf + ', watchlist floor $' + FMT.format(R.floor) + '.';
   }
-  function openRow() {
-    var r = bySlug[st.row], dlg = $('dlg'); if (!r) return;
-    var b = $('dbody'); b.textContent = '';
-    var c = el('button', 'Close', 'close', { type: 'button' }); c.addEventListener('click', function () { dlg.close(); });
-    b.appendChild(c);
-    b.appendChild(el('h2', '#' + r.rank + ' ' + r.name, null, { id: 'dtitle' }));
-    b.appendChild(el('p', (r.category || 'Uncategorised') + ' · ' + (r.chains.join(', ') || 'chain unknown') + ' · ' + (r.watch ? 'watchlist' : 'early candidate') + ' · listed ' + (r.listed || 'unknown') + (r.age != null ? ' (' + r.age + ' days)' : ''), 'muted'));
-    var g = el('div', null, 'kv');
-    kv(g, 'Implied value', usd(r.implied)); kv(g, 'Wide range', usd(r.low) + ' – ' + usd(r.high)); kv(g, 'Current TVL', usd(r.tvl)); kv(g, '7d TVL change', pct(r.ch7));
-    kv(g, 'Implied market cap ÷ TVL', (r.implied / r.tvl).toFixed(2) + '×'); kv(g, 'Peer ratio used', r.ratio.toFixed(2) + '×');
-    kv(g, 'Category median (live)', r.cat_ratio == null ? 'no peers' : r.cat_ratio.toFixed(2) + '×'); kv(g, 'All-market median', D.model.global_median_ratio.toFixed(2) + '×');
-    kv(g, 'Peer group', r.peers + ' live-token, ' + r.pre_peers + ' pre-token on board'); kv(g, 'Confidence', r.conf);
-    b.appendChild(g);
-    var lc = r.loo_cat;
-    if (L.n) b.appendChild(el('p', 'Back-test for this category (leave-one-out, live-token ' + (r.category || 'uncategorised') + ' protocols): ' + (lc ? 'median error ' + lc.median_factor.toFixed(1) + '×, ' + (lc.coverage * 100).toFixed(0) + '% of ranges held the real market cap, n = ' + lc.n + '. ' + (lc.median_factor > L.median_factor ? 'Worse than the overall ' + L.median_factor.toFixed(1) + '×: be more sceptical of this estimate.' : 'Not worse than the overall ' + L.median_factor.toFixed(1) + '×.') : 'fewer than ' + D.model.min_peers + ' held-out peers, no category-level result; only the overall ' + L.median_factor.toFixed(1) + '× applies.') + ' A typical-error band is ' + usd(r.implied / L.median_factor) + ' – ' + usd(r.implied * L.median_factor) + ' (estimate ÷ and × the overall median error). This describes past fit on live tokens, not the chance this protocol launches a token or reaches that value.', 'muted'));
-    b.appendChild(el('p', 'Arithmetic: ' + usd(r.tvl) + ' × ' + r.ratio.toFixed(3) + ' × growth ' + r.gm.toFixed(3) + ' × maturity ' + r.mm.toFixed(3) + ' = ' + usd(r.implied) + '. The range is intentionally wide; the true figure could sit outside it.', 'muted'));
-    list(b, 'Due diligence for this protocol', r.dd);
-    list(b, 'Low-cost farm plan', r.steps, true);
-    if (!dlg.open) { lastFocus = document.activeElement; lastSlug = r.slug; }
-    if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); }
-    c.focus();
+
+  // ---------- boot ----------
+  function applyParams(params) {
+    if (!params) return;
+    view.q = params.get('q') || '';
+    view.cat = params.get('cat') || 'all';
+    view.conf = params.get('conf') || 'all';
+    view.scope = params.get('scope') || 'candidates';
+    $('#q').value = view.q;
+    if ($('#cat').querySelector('option[value="' + CSS.escape(view.cat) + '"]')) $('#cat').value = view.cat;
+    $('#conf').value = view.conf;
+    $('#scope').value = view.scope;
   }
-  $('dlg').addEventListener('close', function () { st.row = ''; writeHash(); restoreFocus(); });
-  $('dlg').addEventListener('click', function (e) { if (e.target === this) this.close(); });
-  $('q').addEventListener('input', function () { st.q = this.value.trim().slice(0, 80); writeHash(); render(); });
-  $('cat').addEventListener('change', function () { st.cat = this.value; writeHash(); render(); });
-  $('scope').addEventListener('change', function () { st.scope = this.value; writeHash(); render(); });
-  $('reset').addEventListener('click', function () { st = { view: st.view, q: '', cat: '', scope: 'all', row: '' }; writeHash(); render(); });
-  Array.prototype.forEach.call(document.querySelectorAll('[data-view]'), function (b) {
-    b.addEventListener('click', function () { st.view = b.getAttribute('data-view'); writeHash(); render(); });
-  });
-  function sync() { readHash(); render(); if (st.row) openRow(); else if ($('dlg').open) $('dlg').close(); }
-  window.addEventListener('hashchange', sync);
-  sync();
+  function render() {
+    var r = route();
+    show(r.name);
+    if (r.name === 'board') {
+      applyParams(r.params);
+      renderBoard();
+    } else if (r.name === 'live') renderLive();
+    else if (r.name === 'method') renderMethod();
+    else detail(r.slug);
+    window.scrollTo(0, 0);
+  }
+  renderChrome();
+  buildControls();
+  renderMethod();
+  window.addEventListener('hashchange', render);
+  render();
 })();

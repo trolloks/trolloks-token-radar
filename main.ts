@@ -1,240 +1,164 @@
-// trolloks - Token Radar for make.fun token-radar-01. Node, standard library only.
-// Reads the snapshot, values pre-token protocols against LIVE peers' market-cap/TVL ratios in the same
-// category, writes board.json, data.js, the dashboard, screenshots and dossier.json.
-//   MAKEFUN_OUTPUT_DIR=out node main.ts --input /input/snapshot.json
+// trolloks - Token Radar for make.fun token-radar-01. Node 22, standard library only.
+//
+// Reads the sealed snapshot, prices every pre-token protocol against live-token peers in
+// the same category, writes the ranked board (board.json), the dashboard data (data.js),
+// copies dashboard/ and screenshots/, and writes the dossier the judge reads.
+//
+//   MAKEFUN_OUTPUT_DIR=out node main.ts --input ../input/snapshot.json
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildRadar, clean, type Protocol, type Snapshot } from './lib/valuation.ts';
 import { buildDossier } from './vendor/makefun-board.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
-const arg = (n: string, d: string): string => {
-  const i = process.argv.indexOf(`--${n}`);
-  return i >= 0 && process.argv[i + 1] !== undefined ? process.argv[i + 1]! : d;
+const arg = (name: string, fallback: string): string => {
+  const at = process.argv.indexOf(`--${name}`);
+  if (at >= 0 && process.argv[at + 1] !== undefined) return process.argv[at + 1]!;
+  const inline = process.argv.find((a) => a.startsWith(`--${name}=`));
+  return inline === undefined ? fallback : inline.slice(name.length + 3);
 };
-const inArg = arg('input', '/input');
-const inFile = inArg.endsWith('.json') ? inArg : join(inArg, 'snapshot.json');
+
+const inputArg = arg('input', '/input');
+const inputFile = inputArg.endsWith('.json') ? inputArg : join(inputArg, 'snapshot.json');
+if (!existsSync(inputFile)) {
+  process.stderr.write(`token radar: no snapshot at ${inputFile}\n`);
+  process.exit(2);
+}
 const out = arg('output', process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
-if (!existsSync(inFile)) { process.stderr.write(`no snapshot at ${inFile}\n`); process.exit(2); }
 
-interface P { slug: string; name: string; category: string | null; chains: string[]; tvl_usd: number; change_7d: number | null; mcap_usd: number | null; listed_at: string | null; gecko_id: string | null; symbol: string | null }
-
-/** Strip control/bidi characters and cap length: snapshot strings are data, never markup. */
-const clean = (s: unknown, max = 80): string => String(s ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2066-\u2069]/g, ' ').trim().slice(0, max);
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 
-function load(): { as_of: string; source: string; floor: number; ps: P[]; watch: string[] } {
-  const o = JSON.parse(readFileSync(inFile, 'utf8'));
-  if (!o || !Array.isArray(o.protocols) || !Array.isArray(o.watchlist) || !/^\d{4}-\d{2}-\d{2}$/.test(o.as_of) || !Number.isSafeInteger(o.floor_usd)) throw new Error('bad snapshot');
+/** Parse and validate the sealed snapshot; a malformed field is dropped, never guessed at. */
+function parseSnapshot(text: string): Snapshot {
+  const o = JSON.parse(text) as Record<string, unknown>;
+  if (!o || !Array.isArray(o.protocols) || !Array.isArray(o.watchlist)) throw new Error('snapshot: protocols and watchlist are required');
+  if (typeof o.as_of !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(o.as_of)) throw new Error('snapshot: as_of is not a date');
+  if (!Number.isSafeInteger(o.floor_usd) || (o.floor_usd as number) <= 0) throw new Error('snapshot: floor_usd');
   const seen = new Set<string>();
-  const ps: P[] = [];
-  for (const r of o.protocols) {
-    if (!r || typeof r.slug !== 'string' || typeof r.name !== 'string' || num(r.tvl_usd) === null || seen.has(r.slug)) continue;
-    seen.add(r.slug);
-    ps.push({
-      slug: r.slug, name: r.name, category: typeof r.category === 'string' ? r.category : null,
-      chains: Array.isArray(r.chains) ? r.chains.filter((c: unknown) => typeof c === 'string') : [],
-      tvl_usd: r.tvl_usd, change_7d: num(r.change_7d), mcap_usd: num(r.mcap_usd),
-      listed_at: typeof r.listed_at === 'string' ? r.listed_at : null,
-      gecko_id: typeof r.gecko_id === 'string' ? r.gecko_id : null, symbol: typeof r.symbol === 'string' ? r.symbol : null,
+  const protocols: Protocol[] = [];
+  for (const raw of o.protocols as Record<string, unknown>[]) {
+    const slug = str(raw.slug);
+    const name = str(raw.name);
+    const tvl = num(raw.tvl_usd);
+    if (slug === null || name === null || tvl === null || seen.has(slug)) continue;
+    seen.add(slug);
+    protocols.push({
+      slug,
+      name,
+      category: str(raw.category),
+      chains: Array.isArray(raw.chains) ? raw.chains.filter((c): c is string => typeof c === 'string') : [],
+      tvl,
+      ch7: num(raw.change_7d),
+      mcap: num(raw.mcap_usd),
+      listed: str(raw.listed_at),
+      gecko: str(raw.gecko_id),
+      symbol: str(raw.symbol),
     });
   }
-  return { as_of: o.as_of, source: clean(o.source, 200), floor: o.floor_usd, ps, watch: o.watchlist.filter((s: unknown) => typeof s === 'string') };
+  return {
+    asOf: o.as_of,
+    source: clean(o.source, 200),
+    floor: o.floor_usd as number,
+    protocols,
+    watchlist: (o.watchlist as unknown[]).filter((s): s is string => typeof s === 'string'),
+  };
 }
 
-// ---- eligibility -------------------------------------------------------------------------------
-const VERSIONED = /\s(V\d+(\.\d+)?|v\d+(\.\d+)?|\d+\.\d+)$/;
-const WRAPPER = /\b(wrapped|wrapper|bridged|receipt)\b|^(binance|coinbase|bybit|okx|bitget|kraken|kucoin|crypto\.com)\b/i;
-/** Pre-token: the index records no token at all. Any mcap, gecko id or symbol means a live token. */
-const preToken = (p: P): boolean => p.mcap_usd === null && p.gecko_id === null && p.symbol === null;
-const isLive = (p: P): boolean => !preToken(p) && p.category !== 'CEX';
-/** Early candidates: pre-token, no exchange, no versioned pool, no wrapper/receipt of another asset. */
-const earlyOk = (p: P): boolean => preToken(p) && p.category !== 'CEX' && !VERSIONED.test(p.name) && !WRAPPER.test(p.name);
+const snapshot = parseSnapshot(readFileSync(inputFile, 'utf8'));
+const radar = buildRadar(snapshot);
 
-// ---- model -------------------------------------------------------------------------------------
-const quant = (a: number[], q: number): number => {
-  const s = [...a].sort((x, y) => x - y);
-  if (s.length === 0) return NaN;
-  const i = (s.length - 1) * q, lo = Math.floor(i);
-  return s[lo]! + (s[Math.min(lo + 1, s.length - 1)]! - s[lo]!) * (i - lo);
-};
-const MIN_PEERS = 5;
-const SHRINK = 5;
-const GROWTH_WEIGHT = 0.3;
-const DAY = 86_400_000;
-const round = (n: number, d = 4): number => Math.round(n * 10 ** d) / 10 ** d;
-
-/** One protocol's estimate from a peer ratio set: the single code path for the board and the leave-one-out check. */
-function estimate(p: P, catR: number[], allR: number[], asOf: string) {
-  const gMed = allR.length ? quant(allR, 0.5) : 0.25; // no live peers at all: fixed prior, flagged by peers = 0
-  const r = catR, n = r.length;
-  const catMed = n ? quant(r, 0.5) : gMed;
-  const w = n / (n + SHRINK);
-  const med = Math.min(3, Math.max(0.03, catMed * w + gMed * (1 - w)));
-  const spreadLo = n >= 3 ? quant(r, 0.25) / catMed : 0.35;
-  const spreadHi = n >= 3 ? quant(r, 0.75) / catMed : 2.5;
-  const age = p.listed_at && Number.isFinite(Date.parse(p.listed_at)) ? Math.max(0, Math.floor((Date.parse(`${asOf}T00:00:00Z`) - Date.parse(`${p.listed_at}T00:00:00Z`)) / DAY)) : null;
-  const growth = Math.min(120, Math.max(-60, p.change_7d ?? 0));
-  const gm = 1 + (growth / 100) * GROWTH_WEIGHT;
-  const mm = 0.6 + (Math.min(age ?? 365, 1095) / 1095) * 0.4;
-  const implied = Math.max(1, Math.round(p.tvl_usd * med * gm * mm));
-  // Deliberately wide band: peer interquartile spread, then widened for thin peer sets and unknown age.
-  const widen = 1 + (n < MIN_PEERS ? 0.5 : 0) + (age === null ? 0.25 : age < 180 ? 0.25 : 0);
-  const low = Math.max(1, Math.round((implied * Math.min(1, spreadLo)) / (1.6 * widen)));
-  const high = Math.round(implied * Math.max(1, spreadHi) * 1.6 * widen);
-  const conf = n >= 15 && age !== null && age >= 365 ? 'moderate' : n >= MIN_PEERS ? 'low' : 'very low';
-  return { n, catMed, med, gm, mm, growth, age, implied, low, high, conf };
-}
-
-/** Leave-one-out: re-estimate every live peer with itself removed from both its category set and the global set. */
-function leaveOneOut(live: P[], asOf: string) {
-  const errs: number[] = [];
-  let covered = 0;
-  const cats = new Map<string, { e: number[]; c: number }>();
-  const cat = (p: P) => p.category ?? '';
-  for (const h of live) {
-    const rest = live.filter((p) => p !== h);
-    if (rest.length === 0) continue;
-    const e = estimate(h, rest.filter((p) => cat(p) === cat(h)).map((p) => p.mcap_usd! / p.tvl_usd), rest.map((p) => p.mcap_usd! / p.tvl_usd), asOf);
-    if (rest.length === 0 || !(e.implied > 0)) continue;
-    errs.push(Math.max(e.implied / h.mcap_usd!, h.mcap_usd! / e.implied));
-    const hit = h.mcap_usd! >= e.low && h.mcap_usd! <= e.high;
-    if (hit) covered++;
-    const g = cats.get(cat(h)) ?? { e: [], c: 0 };
-    g.e.push(errs[errs.length - 1]!);
-    if (hit) g.c++;
-    cats.set(cat(h), g);
-  }
-  const n = errs.length;
-  // Per-category back-test, only where at least MIN_PEERS held-out protocols exist (fewer is noise).
-  const by_cat: Record<string, { n: number; median_factor: number; coverage: number }> = {};
-  for (const [k, g] of cats) if (g.e.length >= MIN_PEERS) by_cat[clean(k || 'Uncategorised', 50)] = { n: g.e.length, median_factor: round(quant(g.e, 0.5), 3), coverage: round(g.c / g.e.length, 4) };
-  return { by_cat, n, median_factor: n ? round(quant(errs, 0.5), 3) : null, coverage: n ? round(covered / n, 4) : null, covered, within_2x: n ? round(errs.filter((x) => x <= 2).length / n, 4) : null };
-}
-
-function build(s: ReturnType<typeof load>) {
-  const live = s.ps.filter((p) => isLive(p) && (p.mcap_usd ?? 0) > 0 && p.tvl_usd > 0);
-  const ratios = (ps: P[]) => ps.map((p) => p.mcap_usd! / p.tvl_usd);
-  const all = ratios(live);
-  const gMed = all.length ? quant(all, 0.5) : 0.25;
-  const byCat = new Map<string, P[]>();
-  for (const p of live) byCat.set(p.category ?? '', [...(byCat.get(p.category ?? '') ?? []), p]);
-
-  const index = new Map(s.ps.map((p) => [p.slug, p]));
-  const chosen = new Map<string, P>();
-  for (const w of s.watch) { const p = index.get(w); if (p) chosen.set(w, p); }
-  s.ps.filter((p) => !chosen.has(p.slug) && earlyOk(p) && p.tvl_usd < s.floor)
-    .sort((a, b) => b.tvl_usd - a.tvl_usd || (a.slug < b.slug ? -1 : 1)).slice(0, 160).forEach((p) => chosen.set(p.slug, p));
-
-  const preByCat = new Map<string, number>();
-  for (const p of chosen.values()) preByCat.set(p.category ?? '', (preByCat.get(p.category ?? '') ?? 0) + 1);
-
-  const scored = [...chosen.values()].map((p) => {
-    const e = estimate(p, ratios(byCat.get(p.category ?? '') ?? []), all, s.as_of);
-    return { p, ...e, pre: preByCat.get(p.category ?? '') ?? 0 };
+/** board.json: gate rows. Farm steps are strings here and structured steps in data.js. */
+const board = radar.rows.map((r) => {
+  const rank = r.rank;
+  const steps = r.plan.steps.map((s, i) => {
+    const head = `Step ${i + 1}: `;
+    const tail = ` | Cost: ${s.cost} | Time: ${s.time}`;
+    const room = 600 - head.length - tail.length;
+    return `${head}${s.action.slice(0, room).trim()}${tail}`;
   });
-  scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : 1));
-  return { scored, live, gMed, gN: all.length, loo: leaveOneOut(live, s.as_of) };
+  return {
+    rank,
+    slug: r.slug,
+    name: r.name,
+    implied_value_usd: r.implied,
+    farm_steps: steps,
+    category: r.category,
+    chains: r.chains,
+    tvl_usd: r.tvl,
+    change_7d: r.ch7,
+    listed_at: r.listed,
+    age_days: r.age,
+    low_usd: r.low,
+    high_usd: r.high,
+    token_status: r.candidate ? 'pre-token' : 'not-a-launch-candidate',
+    watchlist: r.watch,
+    confidence: r.confidence,
+  };
+});
+
+const data = {
+  ...radar,
+  rows: radar.rows.map((r) => ({ ...r, note: '' })),
+};
+// Escape the JSON so a snapshot string can never close the script tag or break the page.
+const safe = JSON.stringify(data)
+  .replace(/</g, '\\u003c')
+  .replace(/>/g, '\\u003e')
+  .replace(/&/g, '\\u0026')
+  .replace(/\u2028/g, '\\u2028')
+  .replace(/\u2029/g, '\\u2029');
+
+// ---- gate invariants: refuse to write a board the scorer would reject ------------------------
+const slugs = new Set<string>();
+const watch = new Set(snapshot.watchlist);
+let previous = Number.POSITIVE_INFINITY;
+for (const [i, row] of board.entries()) {
+  if (slugs.has(row.slug)) throw new Error(`invariant: duplicate slug ${row.slug}`);
+  slugs.add(row.slug);
+  if (row.rank !== i + 1) throw new Error(`invariant: rank ${row.rank} at position ${i + 1}`);
+  if (!(row.implied_value_usd > 0)) throw new Error(`invariant: ${row.slug} has no implied value`);
+  if (row.implied_value_usd > previous) throw new Error(`invariant: ${row.slug} breaks the value order`);
+  previous = row.implied_value_usd;
+  if (row.farm_steps.length < 3 || row.farm_steps.length > 12) throw new Error(`invariant: ${row.slug} has ${row.farm_steps.length} steps`);
+  for (const step of row.farm_steps) if (step.trim().length < 20 || step.length > 600) throw new Error(`invariant: ${row.slug} step length ${step.length}`);
+  if (row.farm_steps.every((s) => s === row.farm_steps[0])) throw new Error(`invariant: ${row.slug} repeats one step`);
 }
-
-// ---- protocol-specific due diligence -----------------------------------------------------------
-const DD: [RegExp, string[]][] = [
-  [/lend|cdp|borrow|collateral/i, ['Read the liquidation and bad-debt history; ask who sets oracle and collateral parameters.', 'Check utilisation and the top borrowers: is TVL real supply or recursive looping?', 'Confirm whether admin keys can change risk parameters, and the timelock length.']],
-  [/dex|amm|swap/i, ['Split volume from incentives: how much TVL leaves when rewards stop?', 'Check pool concentration and whether liquidity is mercenary or protocol-owned.', 'Look for wash-trading signals: volume far above fees earned.']],
-  [/liquid staking|staking|restak/i, ['Review validator or operator set concentration and slashing coverage.', 'Check the redemption path and the receipt token\'s peg history under stress.', 'Is the receipt token a wrapper of an asset you already hold? That is not a separate token upside.']],
-  [/bridge/i, ['Find the trust model: multisig, light client or optimistic? Who holds upgrade keys?', 'Check audit scope and past exploit history of this and similar bridges.', 'TVL is locked custody, not usage; compare to monthly transfer volume.']],
-  [/yield|aggregator|vault|farm/i, ['Trace where the yield comes from: fees, emissions or leverage?', 'List the underlying protocols; every layer adds smart-contract risk.', 'Check withdrawal limits and strategy-change permissions.']],
-  [/rwa|real/i, ['Identify the issuer, custodian and legal wrapper; onchain TVL can be an offchain claim.', 'Check redemption terms and whether transfers are allow-listed (KYC).', 'Token airdrops are unlikely for issuer-controlled assets; verify before spending.']],
-  [/deriv|perp|option|basis/i, ['Check insurance fund size, ADL rules and oracle design.', 'Open interest versus TVL tells you if the book is real; look for one dominant market maker.', 'Review jurisdiction notices that could restrict users.']],
-  [/curator|allocator/i, ['Look at the curator\'s track record, fee and which markets it can allocate into.', 'TVL belongs to underlying lenders; a curator may never issue its own token.', 'Check timelocks on allocation changes and the cap per market.']],
-  [/stable/i, ['Read the collateral backing and peg-defence mechanism.', 'Check depeg history and redemption liquidity.', 'Note issuer freeze powers.']],
-  [/insur|cover/i, ['Check claims history and how payouts are decided.', 'Capacity versus TVL: is cover actually purchased?']],
-  [/predict|gaming|nft|social/i, ['Check volume vs. TVL; activity, not deposits, drives value here.', 'Verify oracle/resolution mechanics and creator-fee permissions.']],
-];
-const GENERIC = ['Find the official docs and audits; absence of both is a strong negative.', 'Check who controls upgradeable contracts and whether a timelock exists.', 'Look at TVL history: a one-week spike plus a large 7d change is often incentives.'];
-const dd = (p: P, age: number | null, n: number): string[] => {
-  const hit = DD.find(([re]) => re.test(p.category ?? ''));
-  const items = [...(hit ? hit[1] : GENERIC)];
-  if (age !== null && age < 120) items.push(`Only ${age} days old: little history; treat any airdrop expectation as speculation.`);
-  if (age === null) items.push('Listing date unknown: age is assumed 365 days and the range is widened.');
-  if (p.chains.length === 1) items.push(`Single-chain (${clean(p.chains[0], 30)}): chain-level outages and bridge dependence apply.`);
-  if (n < MIN_PEERS) items.push(`Only ${n} live-token peers in this category: the multiple leans on the all-market median.`);
-  if ((p.change_7d ?? 0) > 60) items.push('7d TVL jump above 60%: check for a temporary incentive or a single large deposit.');
-  return items;
-};
-
-const steps = (p: P, age: number | null): string[] => {
-  const chain = clean(p.chains[0] ?? 'its main chain', 30), name = clean(p.name, 50);
-  const cap = p.tvl_usd >= 1e9 ? 150 : p.tvl_usd >= 1e8 ? 100 : 50;
-  const hold = age !== null && age < 180 ? 60 : 30;
-  return [
-    `Use a fresh wallet holding only farm funds and keep the seed offline. Cost: under $3 gas. Time: 5 minutes.`,
-    `Deposit about $${cap} into ${name} on ${chain} through its official app only. Cost: $${cap} capital plus ~$5 gas. Time: 15 minutes.`,
-    `Make one genuine action a week (deposit, swap, borrow or vote); no volume farming. Cost: ~$2 gas a week. Time: 10 minutes a week.`,
-    `Hold the position for ${hold} days so it spans several snapshots. Cost: capital stays deployed. Time: ${hold} days.`,
-    `Never sign claim links from DMs; verify any rewards page from the protocol's own site. Cost: nothing. Time: 10 minutes.`,
-    `Keep a log of wallet, dates and transactions to unwind cleanly. Cost: nothing. Time: 5 minutes.`,
-  ];
-};
-
-// ---- run ---------------------------------------------------------------------------------------
-const snap = load();
-const { scored, live, gMed, gN, loo } = build(snap);
-const board = scored.map((s, i) => ({
-  rank: i + 1, slug: s.p.slug, name: s.p.name, category: s.p.category, chains: s.p.chains, tvl_usd: s.p.tvl_usd,
-  change_7d: s.p.change_7d, mcap_usd: s.p.mcap_usd, listed_at: s.p.listed_at, gecko_id: s.p.gecko_id, symbol: s.p.symbol,
-  token_status: 'pre-token' as const, age_days: s.age, implied_value_usd: s.implied,
-  model: { base_multiple: round(s.med), growth_pct: s.growth, growth_multiplier: round(s.gm), maturity_multiplier: round(s.mm), age_days: s.age },
-  farm_steps: steps(s.p, s.age),
-}));
-// runtime invariants: refuse to write a board that is duplicated, non-finite/negative, or out of order
-{
-  const seenSlugs = new Set<string>();
-  board.forEach((r, i) => {
-    if (seenSlugs.has(r.slug)) throw new Error(`invariant: duplicate slug ${r.slug}`);
-    seenSlugs.add(r.slug);
-    if (!Number.isFinite(r.implied_value_usd) || r.implied_value_usd < 0) throw new Error(`invariant: ${r.slug} has implied value ${r.implied_value_usd}`);
-    if (r.rank !== i + 1) throw new Error(`invariant: ${r.slug} has rank ${r.rank} at position ${i + 1}`);
-    if (i > 0 && r.implied_value_usd > board[i - 1]!.implied_value_usd) throw new Error(`invariant: rank ${r.rank} (${r.slug}) outranks rank ${i} on implied value`);
-  });
-}
-// gate checks
-const wset = new Set(board.map((r) => r.slug));
-const missing = snap.watch.filter((w) => snap.ps.some((p) => p.slug === w) && !wset.has(w));
-if (missing.length) throw new Error(`watchlist missing: ${missing.join(',')}`);
-if (board.length > 1 && board[0]!.implied_value_usd === board[board.length - 1]!.implied_value_usd) throw new Error('flat board');
-for (const r of board) for (const t of r.farm_steps) if (t.length < 20 || t.length > 600) throw new Error(`step length ${r.slug}`);
-
-const wl = new Set(snap.watch);
-const radar = {
-  as_of: snap.as_of, source: snap.source, floor_usd: snap.floor, model_version: 'trolloks-peer-1',
-  model: { global_median_ratio: round(gMed), live_peers: gN, min_peers: MIN_PEERS, shrink: SHRINK, loo, growth_weight: GROWTH_WEIGHT },
-  watchlist_size: snap.watch.length, board_size: board.length, early_size: board.filter((r) => !wl.has(r.slug)).length,
-  live_size: live.length,
-  rows: scored.map((s, i) => ({
-    rank: i + 1, slug: clean(s.p.slug, 100), name: clean(s.p.name), category: s.p.category === null ? null : clean(s.p.category, 50),
-    chains: s.p.chains.slice(0, 12).map((c) => clean(c, 30)), tvl: s.p.tvl_usd, ch7: s.p.change_7d, listed: s.p.listed_at === null ? null : clean(s.p.listed_at, 10),
-    age: s.age, implied: s.implied, low: s.low, high: s.high, ratio: round(s.med), cat_ratio: Number.isNaN(s.catMed) ? null : round(s.catMed),
-    peers: s.n, pre_peers: s.pre, conf: s.conf, gm: round(s.gm), mm: round(s.mm), watch: wl.has(s.p.slug), loo_cat: loo.by_cat[clean(s.p.category || 'Uncategorised', 50)] ?? null, dd: dd(s.p, s.age, s.n).map((t) => clean(t, 240)),
-    steps: steps(s.p, s.age).map((t) => clean(t, 600)),
-  })),
-  live: live.sort((a, b) => b.mcap_usd! - a.mcap_usd!).slice(0, 40).map((p) => ({
-    slug: clean(p.slug, 100), name: clean(p.name), category: p.category === null ? null : clean(p.category, 50), tvl: p.tvl_usd, mcap: p.mcap_usd, ch7: p.change_7d, ratio: round(p.mcap_usd! / p.tvl_usd),
-  })),
-};
-const safeJs = JSON.stringify(radar).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+if (board.length < 100 || board.length > 4000) throw new Error(`invariant: board has ${board.length} rows`);
+if (board.length > 1 && board[0]!.implied_value_usd === board[board.length - 1]!.implied_value_usd) throw new Error('invariant: flat board');
+const missing = [...watch].filter((slug) => radar.rows.some((r) => r.slug === slug) && !slugs.has(slug));
+if (missing.length > 0) throw new Error(`invariant: watchlist missing ${missing.join(',')}`);
 
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
-writeFileSync(join(out, 'data.js'), `window.RADAR=${safeJs};\n`);
+writeFileSync(join(out, 'data.js'), `window.RADAR=${safe};\n`);
 
 const copyFiles = (from: string, to: string): string[] => {
   if (!existsSync(from)) return [];
   mkdirSync(to, { recursive: true });
-  return readdirSync(from).filter((n) => !n.startsWith('.') && statSync(join(from, n)).isFile()).map((n) => (copyFileSync(join(from, n), join(to, n)), n));
+  return readdirSync(from)
+    .filter((name) => !name.startsWith('.') && statSync(join(from, name)).isFile())
+    .map((name) => (copyFileSync(join(from, name), join(to, name)), name));
 };
 copyFiles(join(here, 'dashboard'), join(out, 'dashboard'));
 const shots = copyFiles(join(here, 'screenshots'), join(out, 'screenshots'));
-if (shots.length < 3) { process.stderr.write('need 3 screenshots\n'); process.exit(1); }
-writeFileSync(join(out, 'dossier.json'), buildDossier(out, { text_max_bytes: 65_536, screenshots: { max: 4, max_bytes: 524_288 }, dashboard: { max_files: 400, max_bytes: 4_194_304 } }));
-process.stdout.write(`trolloks: ${board.length} rows (${radar.early_size} early), ${live.length} live peers, global mcap/TVL median ${round(gMed)}; LOO n=${loo.n} median error ${loo.median_factor ?? "n/a"}x coverage ${loo.coverage ?? "n/a"}\n`);
+if (shots.length < 3) {
+  process.stderr.write(`token radar: ${shots.length} screenshots, need 3 (board, detail, filtered)\n`);
+  process.exit(1);
+}
+writeFileSync(
+  join(out, 'dossier.json'),
+  buildDossier(out, {
+    text_max_bytes: 65_536,
+    screenshots: { max: 4, max_bytes: 524_288 },
+    dashboard: { max_files: 400, max_bytes: 4_194_304 },
+  }),
+);
+
+const c = radar.counts;
+process.stdout.write(
+  `token radar: ${board.length} rows (${c.candidates} candidates of ${c.preToken} pre-token), ` +
+    `${c.watchlist}/${c.watchlist} watchlist, ${c.live} live peers, global ${radar.model.globalMedian}x; ` +
+    `backtest n=${radar.model.check.n} median ${radar.model.check.medianFactor}x rho ${radar.model.check.spearman}\n`,
+);
