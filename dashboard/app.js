@@ -464,7 +464,8 @@
       terms.appendChild(d);
     });
     left.appendChild(terms);
-    left.appendChild(el('p', null, 'The fitted curve is log(market cap / TVL) = ' + R.model.value.intercept.toFixed(3) + ' ' + (R.model.value.slope < 0 ? '−' : '+') + ' ' + Math.abs(R.model.value.slope).toFixed(3) + ' × ln(TVL), plus a category adjustment (here ' + (r.categoryAdj * 100).toFixed(0) + '%). At $100M TVL the size curve gives ' + multi(R.model.value.multipleAt100m) + '; at this TVL the full model gives ' + multi(multiple) + '. Held out, it misses by ' + R.model.value.loo.toFixed(2) + '× (leave-one-out) and ' + R.model.value.wf.toFixed(2) + '× (walk-forward).'));
+    var adjPct = Math.expm1(r.categoryAdj) * 100;
+    left.appendChild(el('p', null, 'log(market cap / TVL) = ' + R.model.value.intercept.toFixed(3) + ' ' + (R.model.value.slope < 0 ? '−' : '+') + ' ' + Math.abs(R.model.value.slope).toFixed(3) + '·ln(TVL) + category (' + (adjPct >= 0 ? '+' : '') + adjPct.toFixed(1) + '%). At $100M the size curve gives ' + multi(R.model.value.multipleAt100m) + '; here the full model gives ' + multi(multiple) + '. Held out: ' + R.model.value.loo.toFixed(2) + '× leave-one-out, ' + R.model.value.wf.toFixed(2) + '× walk-forward.'));
     var oddsBox = el('div', 'sandbox');
     var oddsHead = el('div', 'sbHead');
     oddsHead.appendChild(el('h4', null, 'Token odds'));
