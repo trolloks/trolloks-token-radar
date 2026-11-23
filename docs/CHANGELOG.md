@@ -112,5 +112,6 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - Free the source budget by removing the dashboard README (the board now carries the
   term evidence) and the duplicated method count/farm tables.
 - Dashboard source is 65,279 of the 65,536-byte dossier cap; screenshots are 1280x1024.
-- Model unchanged from v5. Held under the user's rule: only a massive improvement earns
-  another submission.
+- Model unchanged from v5. The planner replaces the method page as the fourth screenshot;
+  the value/odds term evidence stays on the board strip and the method page in the source.
+- Submitted as the measured feature test: ledger + evidence strip + farm scenarios + planner.
