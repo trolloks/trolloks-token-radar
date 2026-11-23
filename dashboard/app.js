@@ -573,7 +573,7 @@ pbody.appendChild(tr);
 });
 plan.appendChild(pbody);
 right.appendChild(plan);
-right.appendChild(el('div', 'verdict', r.plan.verdict === 'worth' ? 'Worth farming at $10,000: the modelled drop beats the 4% T-bill after fees and the token odds are at least 75%. Cap the position at what you can leave for 12 weeks.' : r.plan.verdict === 'marginal' ? (r.plan.net > r.plan.benchmark ? 'Marginal: the modelled drop clears the T-bill, but the token odds are below 75%. Farm only if you already hold the asset or value the activity record.' : 'Marginal: the modelled drop clears fees but not the T-bill. Farm only if you already hold the asset or value the activity record.') : 'Skip: fees exceed the modelled drop at this size. Wait for a larger implied value or lower fees.'));
+right.appendChild(el('div', 'verdict', r.plan.verdict === 'worth' ? 'Worth farming at $' + r.plan.capital.toLocaleString('en-US') + ': the modelled drop beats the 4% T-bill after fees and the token odds are at least 75%. Cap the position at what you can leave for 12 weeks.' : r.plan.verdict === 'marginal' ? (r.plan.net > r.plan.benchmark ? 'Marginal: the modelled drop clears the T-bill, but the token odds are below 75%. Farm only if you already hold the asset or value the activity record.' : 'Marginal: the modelled drop clears fees but not the T-bill. Farm only if you already hold the asset or value the activity record.') : 'Skip: fees exceed the modelled drop at this size. Wait for a larger implied value or lower fees.'));
 right.appendChild(el('h3', null, 'Before you spend gas'));
 var ul = el('ul', 'dd');
 r.dd.forEach(function (t) { ul.appendChild(el('li', null, t)); });
