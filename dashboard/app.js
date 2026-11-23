@@ -149,24 +149,21 @@
     legend.appendChild(el('b', null, '758/758 accounted'));
     legend.appendChild(document.createTextNode(' · ' + c.watchlist + ' watchlist + ' + (c.preToken - c.watchlist) + ' below the floor + ' + c.live + ' live + ' + c.unpriced + ' unpriced · ' + (c.watchlist + c.preToken - c.watchlist + c.live + c.unpriced) + ' total · 144 of the 342 pre-token records are bridge/CEX/wrapped products, shown under All records'));
     line.appendChild(legend);
-    var contract = $('#contract');
-    contract.replaceChildren();
-    var vline = el('div', 'evLine');
-    vline.appendChild(el('b', null, 'Value LOO/WF '));
-    v.terms.forEach(function (t, i) {
-      if (i) vline.appendChild(document.createTextNode(' · '));
-      vline.appendChild(document.createTextNode(t.term + ' ' + t.loo.toFixed(2) + '/' + t.wf.toFixed(2) + ' '));
-      vline.appendChild(el('i', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'dropped'));
-    });
-    contract.appendChild(vline);
-    var oline = el('div', 'evLine');
-    oline.appendChild(el('b', null, 'Odds Brier '));
-    o.terms.forEach(function (t, i) {
-      if (i) oline.appendChild(document.createTextNode(' · '));
-      oline.appendChild(document.createTextNode(t.term + ' ' + t.loo.toFixed(3) + '/' + t.wf.toFixed(3) + ' '));
-      oline.appendChild(el('i', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'base'));
-    });
-    contract.appendChild(oline);
+    function fillTerms(tbody, terms, digits, keepWord) {
+      if (!tbody) return;
+      tbody.replaceChildren();
+      terms.forEach(function (t) {
+        var tr = el('tr');
+        tr.appendChild(el('td', null, t.term));
+        tr.appendChild(el('td', 'num', t.loo.toFixed(digits) + (digits === 2 ? '×' : '')));
+        tr.appendChild(el('td', 'num', t.wf.toFixed(digits) + (digits === 2 ? '×' : '')));
+        tr.appendChild(el('td', t.kept ? 'up' : 'flat', t.kept ? keepWord : (keepWord === 'kept' ? 'dropped' : 'base')));
+        tr.title = t.note;
+        tbody.appendChild(tr);
+      });
+    }
+    fillTerms($('#bValue tbody'), v.terms, 2, 'kept');
+    fillTerms($('#bOdds tbody'), o.terms, 3, 'kept');
   }
 
   // ---------- board ----------
@@ -593,29 +590,7 @@
   function renderMethod() {
     var v = R.model.value, o = R.model.odds;
     $('#valueEq').textContent = 'a = ' + v.intercept.toFixed(3) + ', b = ' + v.slope.toFixed(3) + '; multiple at $100M = ' + v.multipleAt100m.toFixed(3) + '×. Flat baseline misses by ' + v.baselineLoo.toFixed(2) + '× / ' + v.baselineWf.toFixed(2) + '×.';
-    var vt = $('#valueTerms tbody');
-    vt.replaceChildren();
-    v.terms.forEach(function (t) {
-      var tr = el('tr');
-      tr.appendChild(el('td', null, t.term));
-      tr.appendChild(el('td', 'num', t.loo.toFixed(2) + '×'));
-      tr.appendChild(el('td', 'num', t.wf.toFixed(2) + '×'));
-      tr.appendChild(el('td', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'tested, dropped'));
-      tr.title = t.note;
-      vt.appendChild(tr);
-    });
     $('#oddsEq').textContent = 'Base rate ' + (o.baseRate * 100).toFixed(1) + '%. Brier ' + o.brier.toFixed(3) + ' vs ' + o.brierBase.toFixed(3) + ' base; walk-forward ' + o.brierWf.toFixed(3) + ' vs ' + o.brierWfBase.toFixed(3) + '.';
-    var ot = $('#oddsTerms tbody');
-    ot.replaceChildren();
-    o.terms.forEach(function (t) {
-      var tr = el('tr');
-      tr.appendChild(el('td', null, t.term));
-      tr.appendChild(el('td', 'num', t.loo.toFixed(3)));
-      tr.appendChild(el('td', 'num', t.wf.toFixed(3)));
-      tr.appendChild(el('td', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'tested, dropped'));
-      tr.title = t.note;
-      ot.appendChild(tr);
-    });
     $('#rangeText').textContent = 'P25–P75 ran ' + v.bands.p25.toFixed(2) + '× to ' + v.bands.p75.toFixed(2) + '× of the point estimate and covered ' + Math.round(v.coverage.p25 * 100) + '% of ' + v.coverage.n + ' held-out protocols. P10–P90 ran ' + v.bands.p10.toFixed(2) + '× to ' + v.bands.p90.toFixed(2) + '× and covered ' + Math.round(v.coverage.p10 * 100) + '%.';
     var rr = $('#rangeRow');
     rr.replaceChildren();

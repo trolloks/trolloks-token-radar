@@ -34,7 +34,10 @@
 <main id="main" tabindex="-1">
   <section id="kpis" class="kpis" aria-label="Model summary"></section>
   <p id="statusLine" class="statusline"></p>
-  <div id="contract" class="contract"></div>
+  <div id="contract" class="boardModel">
+    <article class="panel"><h3>Value model · leave-one-out / walk-forward</h3><table class="mini" id="bValue"><thead><tr><th>Term</th><th class="num">LOO</th><th class="num">WF</th><th>Verdict</th></tr></thead><tbody></tbody></table></article>
+    <article class="panel"><h3>Token odds · 5-fold / walk-forward Brier</h3><table class="mini" id="bOdds"><thead><tr><th>Model</th><th class="num">5-fold</th><th class="num">WF</th><th>Verdict</th></tr></thead><tbody></tbody></table></article>
+  </div>
 
   <section id="boardView">
     <div class="toolbar">
@@ -112,15 +115,13 @@
         <h3>The value model</h3>
         <p class="eq">implied = TVL × exp(a + b × ln TVL)</p>
         <p class="muted" id="valueEq"></p>
-        <table class="mini" id="valueTerms"><thead><tr><th>Term</th><th class="num">Leave-one-out</th><th class="num">Walk-forward</th><th>Verdict</th></tr></thead><tbody></tbody></table>
-        <p class="muted">Kept terms are in the final model; the rest were tested and dropped. A flat multiple is the baseline every term must beat.</p>
+        <p class="muted">The term-by-term results are on the board. Kept terms are in the final model; the rest were tested and dropped.</p>
       </article>
       <article class="panel formula">
         <h3>The token odds</h3>
         <p class="eq">odds = logistic(size, age, growth, category rate)</p>
         <p class="muted" id="oddsEq"></p>
-        <table class="mini" id="oddsTerms"><thead><tr><th>Model</th><th class="num">5-fold Brier</th><th class="num">Walk-forward</th><th>Verdict</th></tr></thead><tbody></tbody></table>
-        <p class="muted">Lower Brier is better. Each row removes one term from the full model; a term is kept when removing it makes both tests worse. The base rate is the benchmark.</p>
+        <p class="muted">Lower Brier is better; the board shows the term-by-term ablation and the base rate.</p>
       </article>
     </div>
     <article class="panel chartWide">
