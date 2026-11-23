@@ -223,3 +223,52 @@ Stronger category priors (K = 5, 10, 20, 40 pseudo-protocols) barely lift the to
 Steakhouse 15% to 20%, Sentora 12% to 16%, while the 5-fold Brier moves 0.211 to 0.208
 and the walk-forward worsens 0.235 to 0.239. The odds gap to the leader is not a
 prior-strength issue, so the validated K=2 model stands.
+
+## v10 candidate, 2026-11-23 — matching the leader's evidence standard
+
+The #1 entry's dashboard (`kiencx`, 966,767) was read from its public cover. Its value
+model is the same size + category structure, but its evidence is presented more
+strongly: a cumulative term table, a shuffled-growth control, a farm view at 14/198
+worth, and a "refitted in this browser" checksum strip. Our model itself is at its
+ceiling: a category-prior sweep (K = 2..100) keeps K=20 as the best joint result (LOO
+3.405, WF 3.267; K=5 gives WF 3.001 but LOO 3.799), and excluding bridge/CEX/wrapped
+peers makes the walk-forward worse. The gap is methodology and presentation, not the
+prior.
+
+v10 changes (commit `41d044a`, branch `v10`):
+- The value table starts from the flat baseline and tests each term against the kept
+  model: size 3.44/3.39 kept, category 3.40/3.27 kept, growth 3.92/3.47, age
+  3.57/5.22, chain 3.85/3.81, and a five-shuffle growth control 3.52/3.39 that must
+  not help.
+- The farm verdict now requires odds >= 0.75 as well as net > the T-bill: 19 of 198
+  candidates are worth, 178 marginal, 1 skip. The planner's client-side recomputation
+  uses the same 0.75 bar.
+- The third screenshot is the filtered farm view (19 worth farms, odds 75-91%), not the
+  RWA category; the board, detail and planner screenshots were rebuilt.
+
+Gate: all local rows pass; two builds are byte-identical; source 65,535/65,536;
+dossier 1,433,997; screenshots 264,931 / 255,011 / 255,788 / 249,017 bytes. The site's
+pre-submit `check` is `overall: true` at 84.7% authored (2,066 of 2,439 lines; main.ts
+116 authored); bundle `69723984...` is 18,994,533 bytes. Scheduled for
+2026-11-24T00:05:30Z, after v9c; the scheduler (PID 1247662) submits it, polls both
+scores and pins the best of the current final entry, v9c and v10. The remaining leader
+features (browser refit/checksum, 0.02%-of-TVL sizing, rank range) need source trimming
+first; the one byte of headroom is the constraint.
+
+## v11 candidate, 2026-11-23 — full source, browser refit and checksum
+
+The #1 dashboard's last differentiator was its "refitted in this browser" strip and
+checksum. v11 adds both:
+- app.js trimmed 40,400 to 37,124 bytes by stripping leading indentation (3,276 bytes),
+  so the dashboard source is 63,759/65,536 and the dossier (64,023 bytes) now shows every
+  source file whole, with no cut.
+- The board legend refits the size curve from the 128 live peers in the browser
+  (intercept 6.744, slope -0.465, matching the model) and checks the first row's
+  category residual; it also recomputes an FNV checksum of the board (FF5DC75C) and
+  compares it with main.ts's value. The status line reads
+  "refit ✓ 6.744 / -0.465 · checksum ✓ FF5DC75C".
+- The model label is radar-v11 in the header and the data.
+- Gate all PASS; two builds byte-identical; screenshots 266,607 / 254,950 / 257,475 /
+  251,157; dossier 1,439,806.
+- Commit `60cb8c3` on `v11`; scheduled 2026-11-24T00:10:30Z, after v10; the scheduler
+  reads the current final entry's score and pins the best of v5/v9c/v10/v11.
