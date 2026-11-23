@@ -28,7 +28,7 @@ complete dev rating.
 | v9c | `4c46abf` (branch `v9-category`) | scheduled 2026-11-24T00:00:30Z | pending | bundle `radar-v9c.tar.gz`; auto-pick if it beats v5 |
 | v10 | `41d044a` (branch `v10`) | scheduled 2026-11-24T00:05:30Z | pending | bundle `radar-v10.tar.gz` (18.99 MB); check overall true, 84.7% authored; scheduler picks best of v5/v9c/v10 |
 | v11 | `fd96b950` (branch `v11`) | scheduled 2026-11-24T00:10:30Z | pending | bundle `radar-v11.tar.gz` (19.71 MB); check overall true, 85.2% authored; codex planner/detail fixes; scheduler picks best of current and v11 |
-| v12 | `d600379` (branch `v12`) | scheduled 2026-11-24T00:15:30Z | pending | per-protocol plan sizing, rank ranges, growth/age note, consistent detail verdict; bundle 20.50 MB; 85.3% authored; last entry |
+| v12 | `f9ff40af` (branch `v12`) | scheduled 2026-11-24T00:15:30Z | pending | per-protocol plan sizing, rank ranges, growth/age note, consistent detail verdict and exact planner allocations; bundle 21.91 MB; 85.4% authored; last entry |
 
 After v9c scores: pick the higher of v5 and v9c (or v8b if it is used) with
 `PUT /api/competitions/token-radar-01/final-entry`, or
@@ -43,20 +43,26 @@ The v11 candidate (`fd96b950`, with the planner eligibility/headline and detail 
 fixes) is scheduled at 00:10:30Z, after v10; its scheduler
 (`/tmp/opencode/submit-pick-v11.sh`, PID 1306716) waits for the v10 pick, then reads the
 current final entry's score and pins the best of v5/v9c/v10/v11.
-The v12 candidate (`d600379`, per-protocol plan sizing, rank ranges, growth/age note,
-consistent detail verdict) is scheduled at 00:15:30Z, after v11; its scheduler
-(`/tmp/opencode/submit-pick-v12.sh`, PID 1381966) waits for the v11 pick, then reads the
-current final entry's score and pins the best of the current/v12. It is the last quota
-entry.
+The v12 candidate (`f9ff40af`, per-protocol plan sizing, rank ranges, growth/age note,
+consistent detail verdict and exact planner allocations) is scheduled at 00:15:30Z,
+after v11; its scheduler (`/tmp/opencode/submit-pick-v12.sh`, PID 1397559) waits for the
+v11 pick, then reads the current final entry's score and pins the best of the
+current/v12. It is the last quota entry.
 
 ## Pick strategy
 
 The dev rate is a screen, not the final score: the final heat re-judges every final entry
 afresh. The armed entries are close in quality; if the dev rates are within about 1,000,
-prefer the entry with the strongest dossier for the final (v11: full source, browser
-refit/checksum, farm view, fixed $10K plans; v12 adds the 0.02%-of-TVL sizing and rank
-ranges but has a 0-skip farm view and $250K top plans; v5/v10 have the earlier
-presentation). The pick can be changed with `PUT final-entry` until 2026-12-14T10:00Z.
+prefer the most complete dossier (v12: full source, browser refit/checksum, farm view,
+0.02%-of-TVL plans with a consistent $250K detail, exact planner allocations and rank
+ranges), then v11 (the same dossier before the $250K plan sizing and allocation fix). The
+v5/v10 presentations are earlier. The pick can be changed with `PUT final-entry` until
+2026-12-14T10:00Z.
+
+The final-entry rule is `Force_Last`, and the server honours an explicit pick under that
+rule (confirmed from the kit's `honoursPick` and the account status: the picked v5 counts
+instead of the later v7). Every scheduler re-pins the best after each submission, so the
+last of the four to run leaves the highest dev rate pinned.
 
 ## Final heat
 

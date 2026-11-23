@@ -296,5 +296,10 @@ The codex's remaining criterion-2 note and the leader's farm/range presentation:
   (now $653 net / $251 per hour for Steakhouse), and the model label still said radar-v11
   (now radar-v12). Source 64,555/65,536; dossier 64,824.
 - Commit `d600379`; bundle `a50261de...` (20,501,816 bytes); site check overall true,
-  85.3% authored (2,191/2,566); scheduled 2026-11-24T00:15:30Z; scheduler PID 1381966.
+  85.3% authored (2,191/2,566).
+- The planner screenshot then exposed a display flaw: `money()` rounds $1,667 to $2K, so
+  a $10K plan across six protocols read "6 protocols · $2K each" ($12K). The summary and
+  allocation column now use exact dollars ($1,667). Source 64,641/65,536; dossier 64,910.
+- Commit `f9ff40af`; bundle `232f0cd6...` (21,907,551 bytes); site check overall true,
+  85.4% authored (2,197/2,571); scheduled 2026-11-24T00:15:30Z; scheduler PID 1397559.
   This is the last quota entry.
