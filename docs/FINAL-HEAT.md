@@ -10,10 +10,10 @@ The final takes the rated entries whose 90% interval high reaches the place-40 l
 40th-best interval low among rated entries, plus the house dashboards and entries with no
 complete dev rating.
 
-- 2026-11-23 check: 17,723 rated entries; place-40 line **943,891**; 10th-best low
-  **949,612**.
+- 2026-11-23 13:58Z check: 17,544 rated entries; place-40 line **943,891**; 10th-best low
+  **949,612**; v5 rank **587**.
 - v5 (`01a2081c-7069-7016-b6be-587e77d750a2`) interval **927,048 - 958,643**: the high
-  clears the line by 14,752, so v5 advances to the final.
+  clears the line by 14,752 and the 10th-best low by 9,031, so v5 advances to the final.
 - The line can rise as entries arrive. Re-check it weekly and after any large competitor
   batch. If a high falls below the line, only a higher-scoring entry restores the place.
 
