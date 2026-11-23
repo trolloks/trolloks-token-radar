@@ -712,7 +712,8 @@ var fees = rows.reduce(function (s, x) { return s + x.f.fees; }, 0);
 var net = drop - fees;
 var bench = budget * 0.04 * horizon / 52;
 var hours = rows.reduce(function (s, x) { return s + x.r.plan.hours; }, 0);
-var verdict = net > bench ? 'worth' : net > 0 ? 'marginal' : 'skip';
+var worthRows = rows.filter(function (x) { return x.f.verdict === 'worth'; }).length;
+var verdict = net > bench && worthRows === rows.length ? 'worth' : net > 0 ? 'marginal' : 'skip';
 var totals = el('div', 'terms planTotals');
 [['Budget', money(budget), chosen.length + ' protocols · ' + money(alloc) + ' each'], ['Drop', money(drop), '7% of implied × share'], ['Fees', money(fees), 'gas across the plan'], ['Net', money(net), verdict.toUpperCase()], ['T-bill', money(bench), horizon + ' weeks at 4%'], ['Net / hour', money(net / Math.max(0.1, hours)), 'sum of active hours · ' + hours.toFixed(1) + ' h']].forEach(function (t) {
 var d = el('div', 'term' + (t[0] === 'Net' ? ' result' : ''));
