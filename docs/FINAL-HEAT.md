@@ -49,6 +49,14 @@ scheduled at 00:15:30Z, after v11; its scheduler
 current final entry's score and pins the best of the current/v12. It is the last quota
 entry.
 
+## Pick strategy
+
+The dev rate is a screen, not the final score: the final heat re-judges every final entry
+afresh. The armed entries are close in quality; if the dev rates are within about 1,000,
+prefer the entry with the strongest dossier for the final (v11/v12: full source, browser
+refit/checksum, farm view; v5/v10 have the earlier presentation). The pick can be changed
+with `PUT final-entry` until 2026-12-14T10:00Z.
+
 ## Final heat
 
 Every final entry is re-judged afresh: 3 Swiss rounds, racing, then a playoff of the top
