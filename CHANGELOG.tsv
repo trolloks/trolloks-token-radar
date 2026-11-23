@@ -1,4 +1,4 @@
 date	iteration	commit	submission	change	judge_rate	rank	notes
 2026-11-19	v1	86a0321f3a2cdeed71fbb67aeb579f2948a732aa	01a1f3e0-e57b-71a5-a237-7c93beb05dd8	peer multiple radar, 200 rows, model check panel	891159	5926	baseline from the first entry
 2026-11-23	v2	dbdc0116e48fac177f66bb978697c3b13a28c348	01a207ed-4076-742e-9a2a-16f5bbc080e3	log-space model, calibrated bands, 342 rows / 198 candidates, costed farm plans, new dashboard	pending	pending	submitted 10:21:58Z; checks passed
-2026-11-23	v3	pending	not submitted	coverage/age/sort fixes, sandbox, shortlist compare, CSV, cost-per-hour plans, walk-forward test	pending	pending	submitted; category-specific 8-step plans
+2026-11-23	v3	3273022156fa2e853dcb5e83708a35708969b07b	01a207fb-7ddf-7329-a8d3-60f14b7ac5ea	coverage/age/sort fixes, sandbox, shortlist compare, CSV, cost-per-hour plans, walk-forward test	pending	pending	submitted 10:37:31Z; category-specific 8-step plans

@@ -59,3 +59,5 @@ Rank is the leaderboard row; the rate is the Bradley-Terry win rate against the 
   with category-specific middle and exit moves instead of one template.
 - Submitted after review: the page features close the gap the match log named, and the
   farm plans changed shape, not just wording.
+- Commit `3273022`, submission `01a207fb-7ddf-7329-a8d3-60f14b7ac5ea`, receipt 10:37:31 UTC.
+- Transcript gate locally: 81.6% of counted lines authored, 115 assistant turns, run record pass.
