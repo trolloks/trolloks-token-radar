@@ -388,6 +388,54 @@ const CATEGORY_ACTION: [RegExp, string][] = [
 ];
 const GENERIC_ACTION = 'Make one genuine USDC deposit or swap so the address has real usage';
 
+/** Category-specific middle and exit moves, so plans differ by what the protocol actually does. */
+const PLAN_VARIANT: [RegExp, { middle: string; exit: string }][] = [
+  [/lend|cdp|borrow|collateral|stable/i, {
+    middle: 'Borrow 30-40% of the deposit in USDT or USDC and keep it in the wallet, so both the supply and the borrow side have real activity',
+    exit: 'Repay the loan in full, withdraw the collateral, and keep the wallet for any future claim',
+  }],
+  [/dex|amm|swap/i, {
+    middle: 'Claim the pool fees after two weeks and restake them into the same position instead of starting a second pool',
+    exit: 'Remove the liquidity, claim the last fees, and unwind the LP receipt before bridging out',
+  }],
+  [/liquid staking|staking|restak/i, {
+    middle: 'Hold the receipt token; do not loop it into another lending market, which doubles the smart-contract risk for the same exposure',
+    exit: 'Unstake or sell the receipt on the secondary market, then bridge the native asset back',
+  }],
+  [/bridge|canonical|cross chain/i, {
+    middle: 'Do one swap on the destination chain so the bridged balance is used, not only parked in the bridge contract',
+    exit: 'Bridge the remaining balance back and keep the destination wallet for any future claim',
+  }],
+  [/yield|aggregator|vault|farm/i, {
+    middle: 'Check the vault fee and the underlying strategy after two weeks; if either changed, exit rather than chase the new APY',
+    exit: 'Request the withdrawal, wait out any queue, and bridge the proceeds back',
+  }],
+  [/rwa|real/i, {
+    middle: 'Complete the allow-list check once and mint the smallest permitted position, then hold it rather than trading it',
+    exit: 'Redeem through the issuer, since secondary liquidity may be thin or restricted',
+  }],
+  [/deriv|perp|option|basis/i, {
+    middle: 'Open and close one small hedged position each week and keep the notional under 2x the deposited margin',
+    exit: 'Close the position, withdraw the margin, and check the funding paid or earned',
+  }],
+  [/curator|allocator/i, {
+    middle: 'Confirm which underlying markets the curator allocated to; exit if the allocation moved into a market you did not underwrite',
+    exit: 'Request the withdrawal from the curator vault and wait out the stated notice period',
+  }],
+  [/predict|gaming|nft|social/i, {
+    middle: 'Take one more position in a liquid market after two weeks so the address has repeated, real activity',
+    exit: 'Settle or sell the position, withdraw, and keep the wallet for future claims',
+  }],
+  [/insur|cover/i, {
+    middle: 'Hold the cover to expiry rather than cancelling after a week; a cancelled policy usually leaves no record',
+    exit: 'Let the policy expire or claim it, then withdraw any remaining balance',
+  }],
+];
+const GENERIC_VARIANT = {
+  middle: 'Repeat the deposit once more after two weeks so the address is not a one-transaction visitor',
+  exit: 'Withdraw the position, bridge back, and keep the wallet for future claims',
+};
+
 const actionFor = (p: Protocol): string => {
   const hit = CATEGORY_ACTION.find(([re]) => re.test(p.category ?? ''));
   return hit ? hit[1] : GENERIC_ACTION;
@@ -423,9 +471,10 @@ const farmPlan = (
   const exit = Math.max(1, gas / 2);
   // Every figure below is the sum of the steps that show it, so the summary and the table agree.
   const totalGas = round(gas * 2 + weekly * weeks + exit, 2);
-  const hours = round((20 + 10 + 15 + weeks * 15 + 10 + 30) / 60, 1);
+  const hours = round((20 + 10 + 15 + 10 + weeks * 15 + 10 + 30) / 60, 1);
   const gasPerHour = round(totalGas / Math.max(0.1, hours), 2);
   const action = actionFor(p);
+  const variant = (PLAN_VARIANT.find(([re]) => re.test(p.category ?? '')) ?? [null, GENERIC_VARIANT])[1];
   const verdict = !candidate
     ? `Skip as a launch farm: ${whyNot ?? 'not a launch candidate'}.`
     : confidence === 'low' && peers < 3
@@ -441,10 +490,11 @@ const farmPlan = (
     },
     { action: `Open ${name} from its official docs on ${chain}, confirm the contract address, and connect the fresh wallet.`, cost: `~$${gas} gas`, time: '10 min' },
     { action: `${action} with $${capital}; read the fee and withdrawal terms before signing.`, cost: `~$${gas} gas + protocol fee`, time: '15 min' },
+    { action: `${variant.middle}.`, cost: `~$${gas} gas`, time: '10 min' },
     { action: `Do one qualifying action a week for ${weeks} weeks - deposit, borrow, swap or vote - and keep leverage low; never wash-trade volume.`, cost: `~$${weekly} gas/week`, time: `${weeks * 15} min total` },
     { action: `Record wallet, tx hashes, dates and the protocol's TVL in a sheet; re-check eligibility only on the protocol's own site.`, cost: '$0', time: '10 min/month' },
     { action: `Hold the position for ${weeks} weeks so the address has a sustained record; read the protocol's own docs for what it counts as usage.`, cost: 'capital stays deployed', time: `${weeks} weeks` },
-    { action: `Exit by withdrawing, repaying any loan and bridging back; keep the wallet for future claims and never sign a DM link.`, cost: `~$${exit} gas`, time: '30 min' },
+    { action: `${variant.exit}. Never sign a claim link from a DM.`, cost: `~$${exit} gas`, time: '30 min' },
   ];
   for (const step of steps) {
     if (step.action.length < 20) step.action = `${step.action} (confirm the terms first).`;

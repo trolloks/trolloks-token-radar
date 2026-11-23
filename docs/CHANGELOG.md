@@ -55,4 +55,7 @@ Rank is the leaderboard row; the rate is the Bradley-Terry win rate against the 
 - Second validation: walk-forward fit on the older 70% of dated peers, tested on the
   newer 29 (median miss 4.31x, rank correlation 0.27, band coverage 76%).
 - Fourth screenshot: the method and backtest page.
-- Held until the change is judged large enough to spend an entry.
+- Farm plans now vary by category (lending, DEX, staking, bridge, RWA, perps, curator),
+  with category-specific middle and exit moves instead of one template.
+- Submitted after review: the page features close the gap the match log named, and the
+  farm plans changed shape, not just wording.
