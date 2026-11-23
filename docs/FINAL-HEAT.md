@@ -26,7 +26,7 @@ complete dev rating.
 | v8b | `4615746` | not submitted | - | fallback bundle `radar-v8b.tar.gz` |
 | v9 | `4689a8f` (branch `v9-category`) | not submitted | - | superseded by v9c |
 | v9c | `4c46abf` (branch `v9-category`) | scheduled 2026-11-24T00:00:30Z | pending | bundle `radar-v9c.tar.gz`; auto-pick if it beats v5 |
-| v10 | `41d044a` (branch `v10`) | scheduled 2026-11-24T00:05:30Z | pending | bundle `radar-v10.tar.gz` (18.99 MB); check overall true, 84.7% authored; scheduler picks best of v5/v9c/v10 |
+| v10 | `41d044a` (branch `v10`) | cancelled 2026-11-23T15:19Z | cancelled | slot freed for v13; bundle `radar-v10.tar.gz` (18.99 MB) remains for reference |
 | v11 | `fd96b950` (branch `v11`) | scheduled 2026-11-24T00:10:30Z | pending | bundle `radar-v11.tar.gz` (19.71 MB); check overall true, 85.2% authored; codex planner/detail fixes; scheduler picks best of current and v11 |
 | v12 | `2f49c6e` (branch `v12`) | scheduled 2026-11-24T00:15:30Z | pending | per-protocol plan sizing with matching verdict/copy, both worth conditions, exact planner allocations, rank ranges, growth/age note, stack-naming title; bundle 22.69 MB; 85.5% authored; last entry |
 
@@ -35,20 +35,17 @@ After v9c scores: pick the higher of v5 and v9c (or v8b if it is used) with
 `node cli/makefun.mjs final token-radar-01 <submission id>`. A later entry does not replace
 the pick by itself. The armed scheduler `/tmp/opencode/submit-pick-v9c.sh` does this
 automatically: it submits v9c, polls its score, and pins it only if it exceeds 942,846.
-The v10 candidate (`41d044a`) is scheduled at 00:05:30Z, after v9c; the scheduler
-(`/tmp/opencode/submit-pick-v10.sh`, PID 1247662) polls both scores and pins the best of
-the current final entry, v9c and v10. It is picked only if its dev rate beats the current
-pick.
+The v10 candidate (`41d044a`) was cancelled before its 00:05:30Z slot on 2026-11-23T15:19Z
+to free the last quota slot for v13; its bundle remains for reference.
 The v11 candidate (`fd96b950`, with the planner eligibility/headline and detail verdict
-fixes) is scheduled at 00:10:30Z, after v10; its scheduler
-(`/tmp/opencode/submit-pick-v11.sh`, PID 1306716) waits for the v10 pick, then reads the
-current final entry's score and pins the best of v5/v9c/v10/v11.
+fixes) is scheduled at 00:10:30Z; its scheduler
+(`/tmp/opencode/submit-pick-v11.sh`, PID 1392562) reads the current final entry's score at
+01:25Z and pins the best of the current/v11.
 The v12 candidate (`2f49c6e`, per-protocol plan sizing with a matching verdict and copy,
 both worth conditions, exact planner allocations, rank ranges, growth/age note, and a
-stack-naming title) is scheduled at 00:15:30Z, after v11; its scheduler
-(`/tmp/opencode/submit-pick-v12.sh`, PID 1517436) waits for the v11 pick, then reads the
-current final entry's score and pins the best of the current/v12. It is the last quota
-entry.
+stack-naming title) is scheduled at 00:15:30Z; its scheduler
+(`/tmp/opencode/submit-pick-v12.sh`, PID 1517436) reads the current final entry's score at
+01:35Z and pins the best of the current/v12. The v13 will use the freed fourth slot.
 
 ## Pick strategy
 
