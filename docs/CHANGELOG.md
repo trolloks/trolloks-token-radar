@@ -306,6 +306,12 @@ The codex's remaining criterion-2 note and the leader's farm/range presentation:
   board footnote and method page still assumed a $10,000 position while the plan is
   0.02% of TVL. The verdict now names the plan's capital and the copy explains the
   sizing. Source 64,784/65,536; dossier 65,053.
+- The targeted codex review completed (exit 0) and found no v12 math or gate bug: it
+  confirmed the 0.02%-of-TVL sizing, the $250K cap, the fee/benchmark and 75% odds gate,
+  the rank range and all 342 rows' arithmetic. Its one finding was the detail headline
+  and the "Worth farming at $10,000" wording, both already fixed in d600379; it judged
+  the 0-skip farm view and the $250K plans acceptable for criteria 3/4. The review log
+  is `/tmp/opencode/codex-review-v12.log`.
 - Commit `cd5a71e`; bundle `de79596f...` (22,350,963 bytes); site check overall true,
   85.5% authored (2,207/2,581); scheduled 2026-11-24T00:15:30Z; scheduler PID 1406634.
   This is the last quota entry.
