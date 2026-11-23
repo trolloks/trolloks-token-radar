@@ -147,6 +147,7 @@ export interface Radar {
   };
   rows: Row[];
   live: LivePeer[];
+  checksum: string;
 }
 
 const DAY = 86_400_000;
@@ -686,6 +687,18 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     }))
     .sort((a, b) => b.mcap - a.mcap);
 
+  const checksum = (() => {
+    let h = 2166136261;
+    for (const r of rows) {
+      const s = `${r.slug}|${r.rank}|${r.implied}`;
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619) >>> 0;
+      }
+    }
+    return h.toString(16).toUpperCase().padStart(8, '0');
+  })();
+
   const kindOf = (r: Row): 'cex' | 'bridge' | 'product' => {
     const category = r.category ?? '';
     if (category === 'CEX' || EXCHANGE_PREFIX.test(r.name)) return 'cex';
@@ -700,7 +713,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     source: snapshot.source,
     floor: snapshot.floor,
     model: {
-      name: 'radar-v5 fitted size curve + token odds',
+      name: 'radar-v11 fitted size curve + token odds + browser refit',
       value: valueCheck,
       odds: oddsCheck,
       livePeers: live.length,
@@ -726,5 +739,6 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     },
     rows,
     live: livePeers,
+    checksum,
   };
 };
