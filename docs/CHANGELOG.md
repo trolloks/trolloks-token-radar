@@ -88,3 +88,5 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - Farm economics: $10,000 over 12 weeks, 7% drop share, fees, net, net/hour and a
   4% T-bill benchmark; verdicts worth/marginal/skip.
 - Screenshots at 1280x1024 to carry more evidence per image.
+- Commit `aa3714f`, submission `01a2081c-7069-7016-b6be-587e77d750a2`, receipt 11:13:31 UTC.
+- Transcript gate locally: 83.0% of counted lines authored, 185 assistant turns, run record pass.
