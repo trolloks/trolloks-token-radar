@@ -151,7 +151,7 @@ copyFiles(join(here, 'dashboard'), join(out, 'dashboard'));
 const evidenceRow = radar.rows.find((r) => r.slug === 'loopscale-lending') ?? radar.rows.find((r) => r.candidate)!;
 const valueNames = ['flat', 'size', 'category', 'growth', 'age', 'chain', 'shuffle'];
 const evidence = {
-  counts: { protocols: radar.counts.protocols, preToken: radar.counts.preToken, candidates: radar.counts.candidates, live: radar.counts.live },
+  counts: { protocols: radar.counts.protocols, preToken: radar.counts.preToken, candidates: radar.counts.candidates, live: radar.counts.live, comps: radar.model.livePeers },
   value: {
     a: radar.model.value.intercept,
     b: radar.model.value.slope,

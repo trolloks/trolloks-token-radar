@@ -4,7 +4,7 @@
 [![rank](https://make.fun/badge/token-radar-01/trolloks/trolloks-token-radar/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 [![reward](https://make.fun/badge/token-radar-01/trolloks/trolloks-token-radar/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
 
-Launch Radar ranks every protocol that records no token in the sealed DefiLlama snapshot by its implied launch value: a fitted log-TVL size curve plus a shrunk category residual gives the value if it launches, and a logistic model on size, age, 7-day growth and category gives the launch odds. The ranking multiplies the two, so the board is an expected value rather than a conditional one. The dashboard separates the 128 live-token protocols, covers all 40 watchlist records, reports blind range coverage, and gives every row a costed farm plan with break-even economics.
+Launch Radar ranks every protocol that records no token in the sealed DefiLlama snapshot by its implied launch value: a fitted log-TVL size curve plus a shrunk category residual gives the value if it launches, and a logistic model on size, age, 7-day growth and category gives the launch odds. The value curve is fitted on 92 traded comps drawn from the 128 live-token records (market-cap/TVL between 0.05x and 20x); the ranking multiplies launch value by odds, so the board is an expected value rather than a conditional one. The dashboard accounts for all 758 records, covers all 40 watchlist records, reports blind five-fold range coverage, and gives every row a 10-step costed farm plan with break-even and downside economics.
 
 ## Run it
 

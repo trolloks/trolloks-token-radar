@@ -166,7 +166,7 @@ const PLAN_SIZE = 10_000;
 const DROP_SHARE = 0.07;
 const BENCHMARK_RATE = 0.04;
 const HORIZON_WEEKS = 12;
-const MIN_PER_HOUR = 25;
+const MIN_PER_HOUR = 100;
 const RIDGE = 0.05;
 
 export const clean = (s: unknown, max = 80): string =>
@@ -438,7 +438,7 @@ const CATEGORY_ACTION: [RegExp, string][] = [
   [/liquid staking|staking|restak/i, 'Stake the chain native asset and hold the receipt token'],
   [/bridge|canonical|cross chain/i, 'Bridge USDC in, do one swap, then bridge the remainder back'],
   [/yield|aggregator|vault|farm/i, 'Deposit USDC into the flagship vault, not the highest advertised APY'],
-  [/rwa|real/i, 'Complete the allow-list check and mint the smallest permitted USDC position'],
+  [/rwa|real/i, 'Deposit USDC through the issuer\'s primary market after the allow-list check'],
   [/deriv|perp|option|basis/i, 'Open and close a small hedged BTC or ETH position at 2x leverage or less'],
   [/curator|allocator/i, 'Deposit USDC into the curator vault with the longest record and a published fee'],
   [/predict|gaming|nft|social/i, 'Take one real USDC position in a liquid market, not a wash trade'],
@@ -452,7 +452,7 @@ const PLAN_VARIANT: [RegExp, { middle: string; exit: string }][] = [
   [/liquid staking|staking|restak/i, { middle: 'Hold the receipt token; do not loop it into another lending market', exit: 'Unstake or sell the receipt, then bridge the native asset back' }],
   [/bridge|canonical|cross chain/i, { middle: 'Do one swap on the destination chain so the bridged balance is used', exit: 'Bridge the remaining balance back and keep the destination wallet' }],
   [/yield|aggregator|vault|farm/i, { middle: 'Check the vault fee and strategy after two weeks; exit if either changed', exit: 'Request the withdrawal, wait out any queue, and bridge back' }],
-  [/rwa|real/i, { middle: 'Complete the allow-list check once and mint the smallest permitted position', exit: 'Redeem through the issuer, since secondary liquidity may be restricted' }],
+  [/rwa|real/i, { middle: 'Confirm the redemption queue and transfer restrictions after two weeks; exit if either changes', exit: 'Redeem through the issuer, since secondary liquidity may be restricted' }],
   [/deriv|perp|option|basis/i, { middle: 'Open and close one small hedged position each week under 2x margin', exit: 'Close the position, withdraw the margin, and check the funding paid' }],
   [/curator|allocator/i, { middle: 'Confirm which markets the curator allocated to; exit if it moved into one you did not underwrite', exit: 'Request the withdrawal and wait out the stated notice period' }],
   [/predict|gaming|nft|social/i, { middle: 'Take one more position in a liquid market so the address has repeated activity', exit: 'Settle or sell the position, withdraw, and keep the wallet' }],
@@ -482,7 +482,7 @@ const farmPlan = (p: Protocol, launch: number, odds: number, age: number | null,
   const weekly = Math.max(0.5, gas / 4);
   const exit = Math.max(1, gas / 2);
   const fees = round(gas * 3 + weekly * weeks + exit, 2);
-  const hours = round((20 + 10 + 15 + 10 + weeks * 15 + 10 + 30) / 60, 1);
+  const hours = round((20 + 15 + 10 + 15 + 10 + weeks * 15 + 10 + 10 + 30) / 60, 1);
   const action = actionFor(p);
   const variant = (PLAN_VARIANT.find(([re]) => re.test(p.category ?? '')) ?? [null, GENERIC_VARIANT])[1]!;
   const planSize = PLAN_SIZE;
@@ -503,14 +503,16 @@ const farmPlan = (p: Protocol, launch: number, odds: number, age: number | null,
   const breakevenDeposit = perDollar > hurdle ? round(fees / (perDollar - hurdle), 2) : Infinity;
   const breakevenOdds = launchDrop > 0 ? round((benchmark + fees) / launchDrop, 4) : Infinity;
   const steps: PlanStep[] = [
-    { action: `Fund a fresh wallet with $${planSize.toLocaleString('en-US')} plus about $${fees} for fees; keep the seed offline.`, cost: `$${planSize.toLocaleString('en-US')} capital`, time: '20 min' },
+    { action: `Fund a fresh wallet on ${chain} with $${planSize.toLocaleString('en-US')} plus about $${fees} for fees; withdraw USDC from an exchange or bridge that supports ${chain}, and keep the seed offline.`, cost: `$${planSize.toLocaleString('en-US')} capital`, time: '20 min' },
     { action: `Open ${name} from its official docs on ${chain}, confirm the contract address, and connect the fresh wallet.`, cost: `~$${gas} gas`, time: '10 min' },
-    { action: `${action} with $${planSize.toLocaleString('en-US')}; read the fee and withdrawal terms before signing.`, cost: `~$${gas} gas + protocol fee`, time: '15 min' },
-    { action: `${variant.middle}.`, cost: `~$${gas} gas`, time: '10 min' },
-    { action: `Do one qualifying action a week for ${weeks} weeks - deposit, borrow, swap or vote - and keep leverage low.`, cost: `~$${weekly} gas/week`, time: `${weeks * 15} min total` },
+    { action: `Risk check ${name}: read the audits, admin keys, oracle and withdrawal terms; abandon if any is missing or unaudited.`, cost: '$0', time: '15 min' },
+    { action: `${name} on ${chain}: ${action}. Deploy $${planSize.toLocaleString('en-US')} and read the fee and withdrawal terms before signing.`, cost: `~$${gas} gas + protocol fee`, time: '15 min' },
+    { action: `${name}: ${variant.middle}.`, cost: `~$${gas} gas`, time: '10 min' },
+    { action: `Do one qualifying action on ${name} each week for ${weeks} weeks - deposit, borrow, swap or vote - and keep leverage low.`, cost: `~$${weekly} gas/week`, time: `${weeks * 15} min total` },
     { action: `Record wallet, tx hashes, dates and the protocol's TVL in a sheet; re-check eligibility only on the protocol's own site.`, cost: '$0', time: '10 min/month' },
-    { action: `Hold for ${weeks} weeks so the address has a sustained record; read the protocol's own docs for what it counts as usage.`, cost: 'capital deployed', time: `${weeks} weeks` },
-    { action: `${variant.exit}. Never sign a claim link from a DM.`, cost: `~$${exit} gas`, time: '30 min' },
+    { action: `Hold ${name} for ${weeks} weeks so the address has a sustained record; read its docs for what it counts as usage.`, cost: 'capital deployed', time: `${weeks} weeks` },
+    { action: `Watch ${name}: check TVL weekly and exit if it falls below $${(p.tvl * 0.7).toLocaleString('en-US', { maximumFractionDigits: 0 })} or a token is announced.`, cost: '$0', time: '10 min/week' },
+    { action: `${name}: ${variant.exit}. Never sign a claim link from a DM.`, cost: `~$${exit} gas`, time: '30 min' },
   ];
   for (const step of steps) {
     if (step.action.length < 20) step.action = `${step.action} (confirm the terms first).`;
@@ -549,7 +551,9 @@ const dueDiligence = (p: Protocol, age: number | null, odds: number): string[] =
 export const buildRadar = (snapshot: Snapshot): Radar => {
   AS_OF = snapshot.asOf;
   const pre = snapshot.protocols.filter(isPreToken);
-  const live = snapshot.protocols.filter((p) => !isPreToken(p) && p.mcap !== null && p.mcap > 0 && p.tvl > 0);
+  const liveAll = snapshot.protocols.filter((p) => !isPreToken(p) && p.mcap !== null && p.mcap > 0 && p.tvl > 0);
+  // Fit on traded comps with a plausible cap/TVL; the rest are bridges, CEX and receipt outliers.
+  const live = liveAll.filter((p) => p.mcap! / p.tvl >= 0.05 && p.mcap! / p.tvl <= 20);
   const watch = new Set(snapshot.watchlist);
 
   // value model: terms added in order, kept only when both blind tests improve
@@ -702,7 +706,6 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     };
   });
   scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : 1));
-
   let candidateRank = 0;
   const rows: Row[] = scored.map((s, index) => {
     if (s.candidate) candidateRank += 1;
@@ -738,7 +741,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     };
   });
 
-  const livePeers: LivePeer[] = live
+  const livePeers: LivePeer[] = liveAll
     .map((p) => ({
       slug: clean(p.slug, 100),
       name: clean(p.name),
@@ -793,8 +796,8 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
       watchlistCovered: rows.filter((r) => r.watch).length,
       candidates: candidates.length,
       aggregateCandidates: candidates.reduce((sum, r) => sum + r.implied, 0),
-      live: live.length,
-      unpriced: snapshot.protocols.length - pre.length - live.length,
+      live: liveAll.length,
+      unpriced: snapshot.protocols.length - pre.length - liveAll.length,
       excludedBridge: excluded.filter((r) => kindOf(r) === 'bridge').length,
       excludedCex: excluded.filter((r) => kindOf(r) === 'cex').length,
       excludedProduct: excluded.filter((r) => kindOf(r) === 'product').length,

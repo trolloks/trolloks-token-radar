@@ -15,7 +15,7 @@
     <span class="eyebrow">make.fun · token-radar-01</span>
     <h1>Launch <span>Radar</span></h1>
     <p class="tagline">What a protocol's token would be worth if it launched today, priced from the snapshot's own record and tested out of sample.</p>
-    <p class="eqLine">implied = <b>launch value</b> × <b>launch odds</b></p>
+    <p class="eqLine">implied = <b>launch value</b> × <b>launch odds</b> · odds = logistic(size, age, 7-day growth, category)</p>
   </div>
   <div class="stamp">
     <div><span>Snapshot</span><b id="asOf">—</b></div>
@@ -27,7 +27,6 @@
 <nav class="tabs" aria-label="Sections">
   <a href="#/board" data-tab="board">Radar board</a>
   <a href="#/live" data-tab="live">Live token peers</a>
-  <a href="#/method" data-tab="method">Method &amp; tests</a>
   <a href="#/compare" data-tab="compare">Shortlist <span id="pinNav" class="pill">0</span></a>
 </nav>
 
@@ -40,6 +39,7 @@
     <div class="toolbar">
       <label class="search"><span>Search</span><input id="q" type="search" placeholder="protocol, chain, category" autocomplete="off"></label>
       <label><span>Category</span><select id="cat"></select></label>
+      <label><span>Chain</span><select id="chain"><option value="all">All chains</option></select></label>
       <label><span>Farm verdict</span><select id="verdict">
         <option value="all">All verdicts</option>
         <option value="worth">Worth farming</option>
@@ -53,9 +53,10 @@
         <option value="pinned">Shortlist only</option>
         <option value="all">All pre-token records</option>
       </select></label>
-      <button type="button" id="csv" class="ghost">Export CSV</button>
+      <label><span>Deposit</span><select id="pos"><option value="1000">$1K</option><option value="10000" selected>$10K</option><option value="50000">$50K</option></select></label>
+      <label><span>Drop share</span><select id="share"><option value="0.035">3.5%</option><option value="0.07" selected>7%</option><option value="0.14">14%</option></select></label>
+      <label><span>Hold</span><select id="horizon"><option value="0" selected>Plan</option><option value="12">12 wk</option><option value="26">26 wk</option></select></label>
       <button type="button" id="compareBtn" class="ghost">Compare shortlist</button>
-      <button type="button" id="reset" class="ghost">Reset</button>
     </div>
     <div class="toolbar sub">
       <p id="count" class="count" role="status" aria-live="polite"></p>
@@ -64,6 +65,7 @@
         <span><i class="dot v-worth"></i>Worth</span><span><i class="dot v-marginal"></i>Marginal</span><span><i class="dot v-skip"></i>Skip</span>
         <span class="sep"></span><span><i class="chip sample watch">WATCH</i> on the snapshot watchlist</span>
       </div>
+      <div class="subActions"><button type="button" id="csv" class="ghost">Export CSV</button><button type="button" id="reset" class="ghost">Reset</button></div>
     </div>
     <div class="tableWrap">
       <table id="table">
@@ -73,6 +75,8 @@
             <th class="num" data-sort="rank"># <small>range</small></th>
             <th data-sort="name">Protocol</th>
             <th class="num" data-sort="tvl">TVL</th>
+            <th class="num" data-sort="ch7">7D</th>
+            <th class="num" data-sort="age">No token</th>
             <th class="num" data-sort="odds">Token odds</th>
             <th class="num" data-sort="implied">Implied value <small>launch × odds</small></th>
             <th class="num" data-sort="p75">P25 – P75</th>
@@ -99,54 +103,6 @@
       </table>
     </div>
     <p class="footnote">A token record here means DefiLlama records a market cap. Protocols with a token record but no market cap are not peers and are counted separately.</p>
-  </section>
-
-  <section id="methodView" hidden>
-    <div class="sectionHead">
-      <h2>Method &amp; tests</h2>
-      <p>Two fitted models. Every term is added to a flat baseline and kept only when it improves both blind tests.</p>
-    </div>
-    <div class="methodGrid">
-      <article class="panel formula">
-        <h3>The value model</h3>
-        <p class="eq">implied = TVL × exp(a + b × ln TVL)</p>
-        <p class="muted" id="valueEq"></p>
-        <table class="mini" id="valueTerms"><thead><tr><th>Term</th><th class="num">Leave-one-out</th><th class="num">Older/newer</th><th>Verdict</th></tr></thead><tbody></tbody></table>
-        <p class="muted">Kept terms are in the final model; the rest were tested and dropped. A flat multiple is the baseline every term must beat.</p>
-      </article>
-      <article class="panel formula">
-        <h3>The token odds</h3>
-        <p class="eq">odds = logistic(size, age, growth, category rate)</p>
-        <p class="muted" id="oddsEq"></p>
-        <table class="mini" id="oddsTerms"><thead><tr><th>Model</th><th class="num">5-fold Brier</th><th class="num">Older/newer</th><th>Verdict</th></tr></thead><tbody></tbody></table>
-        <p class="muted">Lower Brier is better. Each row removes one term from the full model; a term is kept when removing it makes both tests worse. The base rate is the benchmark.</p>
-      </article>
-    </div>
-    <p class="muted">The older/newer split is a cohort holdout, not a historical forecast. Blind coverage is measured on launch value over held-out folds; in-sample is 50/80.</p>
-    <article class="panel chartWide">
-      <h3>Held-out calibration</h3>
-      <p class="muted">Every dot is a live-token protocol priced by the value curve that never saw it. The dashed diagonal is a perfect call; colour is the confidence band.</p>
-      <div id="calChart" aria-label="Predicted versus actual market cap, held out"></div>
-    </article>
-    <div class="methodGrid">
-      <article class="panel">
-        <h3>Range honesty</h3>
-        <p class="muted" id="rangeText"></p>
-        <div class="scoreRow" id="rangeRow"></div>
-      </article>
-      <article class="panel">
-        <h3>Farm economics</h3>
-        <p class="muted">A $10,000 position over 12 weeks. Drop = implied value × 7% × position ÷ TVL. Fees are the plan's gas. The benchmark is the same money in a 4% T-bill for 12 weeks.</p>
-        <h3>Limits</h3>
-        <ul class="limits">
-          <li>The snapshot is one day; TVL moves and the band is wider than one point estimate.</li>
-          <li>Market cap is circulating value, not fully diluted.</li>
-          <li>The odds are the peers' record, not a prediction that this protocol launches.</li>
-          <li>Past coverage is not a chance that a pre-token protocol reaches its band.</li>
-        </ul>
-        <p class="muted source" id="provenance"></p>
-      </article>
-    </div>
   </section>
 
   <section id="compareView" hidden>
