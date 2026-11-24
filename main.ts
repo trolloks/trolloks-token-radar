@@ -70,8 +70,8 @@ const snapshot = parseSnapshot(readFileSync(inputFile, 'utf8'));
 const radar = buildRadar(snapshot);
 
 /** board.json: gate rows. Farm steps are strings here and structured steps in data.js. */
-const board = radar.rows.map((r) => {
-  const rank = r.rank;
+const board = radar.rows.filter((r) => r.candidate).map((r) => {
+  const rank = r.candidateRank!;
   const steps = r.plan.steps.map((s, i) => {
     const head = `Step ${i + 1}: `;
     const tail = ` | Cost: ${s.cost} | Time: ${s.time}`;

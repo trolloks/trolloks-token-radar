@@ -46,8 +46,9 @@ const missing = snapshot.watchlist.filter((s) => !seen.has(s));
 ok(missing.length === 0, 'coverage: every watchlist slug', missing.length ? missing.slice(0, 5).join(', ') : `${snapshot.watchlist.length}/${snapshot.watchlist.length}`);
 
 // --- data.js agrees with the board ------------------------------------------------------------
-ok(radar.rows.length === board.length, 'data.js rows match board rows', `${radar.rows.length} vs ${board.length}`);
-const mismatch = radar.rows.find((r, i) => r.slug !== board[i].slug || r.implied !== board[i].implied_value_usd);
+const candidates = radar.rows.filter((r) => r.candidate);
+ok(candidates.length === board.length, 'data.js candidates match board rows', `${candidates.length} vs ${board.length}`);
+const mismatch = candidates.find((r, i) => r.slug !== board[i].slug || r.implied !== board[i].implied_value_usd);
 ok(mismatch === undefined, 'data.js values match the board', mismatch ? mismatch.slug : 'all rows');
 
 // --- dashboard_files --------------------------------------------------------------------------

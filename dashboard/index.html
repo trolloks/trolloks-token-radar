@@ -70,7 +70,7 @@
         <thead>
           <tr>
             <th class="starcol" title="Shortlist">&#9734;</th>
-            <th class="num" data-sort="rank">#</th>
+            <th class="num" data-sort="rank"># <small>range</small></th>
             <th data-sort="name">Protocol</th>
             <th class="num" data-sort="tvl">TVL</th>
             <th class="num" data-sort="odds">Token odds</th>
@@ -122,7 +122,7 @@
         <p class="muted">Lower Brier is better. Each row removes one term from the full model; a term is kept when removing it makes both tests worse. The base rate is the benchmark.</p>
       </article>
     </div>
-    <p class="muted">The older/newer split is a cohort holdout, not a historical forecast. Blind coverage is measured on held-out folds; in-sample is 50/80.</p>
+    <p class="muted">The older/newer split is a cohort holdout, not a historical forecast. Blind coverage is measured on launch value over held-out folds; in-sample is 50/80.</p>
     <article class="panel chartWide">
       <h3>Held-out calibration</h3>
       <p class="muted">Every dot is a live-token protocol priced by the value curve that never saw it. The dashed diagonal is a perfect call; colour is the confidence band.</p>

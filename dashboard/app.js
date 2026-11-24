@@ -10,7 +10,7 @@ var SVGNS = 'http://www.w3.org/2000/svg';
 function checksumOf(rows) {
 var h = 2166136261;
 rows.forEach(function (r) {
-var s = r.slug + '|' + r.rank + '|' + r.implied;
+var s = r.slug + '|' + r.candidateRank + '|' + r.implied;
 for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
 });
 return h.toString(16).toUpperCase().padStart(8, '0');
@@ -99,7 +99,6 @@ if (parts[0] === 'p' && parts[1]) return { name: 'detail', slug: decodeURICompon
 if (parts[0] === 'live') return { name: 'live' };
 if (parts[0] === 'method') return { name: 'method' };
 if (parts[0] === 'compare') return { name: 'compare', params: params };
-if (parts[0] === 'plan') return { name: 'plan' };
 return { name: 'board', params: params };
 }
 function show(name) {
@@ -120,12 +119,18 @@ function renderChrome() {
 $('#asOf').textContent = R.asOf;
 $('#peerCount').textContent = FMT.format(R.counts.live);
 var v = R.model.value, o = R.model.odds, c = R.counts;
+var vAll = v.terms.filter(function (t) { return !/baseline|control/.test(t.term); });
+var vKept = vAll.filter(function (t) { return t.kept; });
+var oAll = o.terms.filter(function (t) { return t.term !== 'base rate'; });
+var oKept = oAll.filter(function (t) { return t.kept; });
+var p25Worth = R.rows.filter(function (r) { return r.candidate && r.plan.p25Verdict === 'worth'; }).length;
 var kpis = [
 ['Out-of-sample miss', v.loo.toFixed(2) + '×', 'older/newer ' + v.wf.toFixed(2) + '× · flat ' + v.baselineLoo.toFixed(2) + '×', true],
 ['Blind coverage', Math.round(v.coverage.outerP25 * 100) + '% / ' + Math.round(v.coverage.outerP10 * 100) + '%', 'held-out folds; in-sample 50/80', false],
 ['Token odds', 'Brier ' + o.brier.toFixed(3), 'base ' + o.brierBase.toFixed(3) + ' · older/newer ' + o.brierWf.toFixed(3), false],
-['Worth farming', c.worth + ' of ' + c.candidates, 'net > T-bill and $25/hour', true],
-['Watchlist ranked', c.watchlistCovered + '/' + c.watchlist, 'plus ' + (c.preToken - c.watchlist) + ' below the floor', false]
+['Terms kept', vKept.length + '/' + vAll.length + ' · ' + oKept.length + '/' + oAll.length, 'value · odds', false],
+['Worth farming', c.worth + ' of ' + c.candidates, 'net > T-bill and $25/hour · ' + p25Worth + ' clear P25', true],
+['Watchlist ranked', c.watchlistCovered + '/' + c.watchlist, 'plus ' + (c.candidates - c.watchlist) + ' other candidates', false]
 ];
 var box = $('#kpis');
 box.replaceChildren();
@@ -142,7 +147,8 @@ line.replaceChildren();
 var bar = el('div', 'ledgerBar');
 [
 [c.watchlist, 'w', 'watchlist'],
-[c.preToken - c.watchlist, 'e', 'below the floor'],
+[c.candidates - c.watchlist, 'e', 'other candidates'],
+[c.preToken - c.candidates, 's', 'set aside'],
 [c.live, 'l', 'live peers'],
 [c.unpriced, 'u', 'unpriced records']
 ].forEach(function (seg) {
@@ -156,7 +162,7 @@ var legend = el('span', 'ledgerLegend');
 legend.appendChild(el('b', null, '758/758 accounted'));
 line.appendChild(legend);
 var acct = el('div', 'chipRow');
-[['watchlist', c.watchlist], ['below floor', c.preToken - c.watchlist], ['live peers', c.live], ['unpriced', c.unpriced], ['set aside', c.preToken - c.candidates]].forEach(function (x) {
+[['watchlist', c.watchlist], ['other candidates', c.candidates - c.watchlist], ['set aside', c.preToken - c.candidates], ['live peers', c.live], ['unpriced', c.unpriced]].forEach(function (x) {
 acct.appendChild(chip(x[0] + ' ' + x[1], ''));
 });
 line.appendChild(acct);
@@ -179,14 +185,17 @@ oline.appendChild(el('i', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'base'));
 });
 contract.appendChild(oline);
 var cline = el('div', 'evLine');
-var rf = refit(), cs = checksumOf(R.rows);
+var rf = refit(), cs = checksumOf(R.rows.filter(function (r) { return r.candidate; }));
 cline.appendChild(el('b', null, 'Integrity '));
-cline.appendChild(document.createTextNode('refit ' + (rf.ok ? '✓' : '✗') + ' ' + rf.a.toFixed(3) + ' / ' + rf.b.toFixed(3) + ' · checksum ' + (cs === R.checksum ? '✓ ' : '✗ ') + cs));
+cline.appendChild(document.createTextNode('refit ' + (rf.ok ? '✓' : '✗') + ' ' + rf.a.toFixed(3) + ' / ' + rf.b.toFixed(3)));
 contract.appendChild(cline);
 var rowsOk = R.rows.every(function (r) { return Math.abs(Math.round(r.launch * r.odds) - r.implied) <= 1; });
-var orderOk = R.rows.every(function (r, i) { return i === 0 || R.rows[i - 1].implied >= r.implied; });
+var cand = R.rows.filter(function (r) { return r.candidate; });
+var candOk = cand.every(function (r) { return Math.abs(Math.round(r.launch * r.odds) - r.implied) <= 1; });
+var orderOk = cand.every(function (r, i) { return i === 0 || cand[i - 1].implied >= r.implied; });
 var chipRow = el('div', 'chipRow');
-chipRow.appendChild(chip('rows ' + (rowsOk ? '✓ ' : '✗ ') + R.rows.length, rowsOk ? 'ok' : ''));
+chipRow.appendChild(chip('board ' + (candOk ? '✓ ' : '✗ ') + cand.length, candOk ? 'ok' : ''));
+chipRow.appendChild(chip('data ' + (rowsOk ? '✓ ' : '✗ ') + R.rows.length, rowsOk ? 'ok' : ''));
 chipRow.appendChild(chip('ranks ' + (orderOk ? '✓' : '✗'), orderOk ? 'ok' : ''));
 chipRow.appendChild(chip('watchlist ' + R.counts.watchlistCovered + '/' + R.counts.watchlist, R.counts.watchlistCovered === R.counts.watchlist ? 'ok' : ''));
 chipRow.appendChild(chip('checksum ' + (cs === R.checksum ? '✓ ' : '✗ ') + cs, cs === R.checksum ? 'ok' : ''));
@@ -274,7 +283,7 @@ tr.appendChild(starTd);
 
 var rank = el('td', 'rank');
 rank.appendChild(el('b', null, r.candidate ? '#' + r.candidateRank : '—'));
-rank.appendChild(el('div', 'subline', '#' + r.rank));
+rank.appendChild(el('div', 'subline', r.rankLow + '–' + r.rankHigh));
 tr.appendChild(rank);
 
 var name = el('td');
@@ -323,7 +332,7 @@ function exportCsv(rows) {
 function cell(v) { var t = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }
 var head = ['rank', 'candidate_rank', 'name', 'slug', 'category', 'chains', 'tvl_usd', 'change_7d', 'age_days', 'token_odds', 'launch_value_usd', 'implied_value_usd', 'p25_usd', 'p75_usd', 'farm_verdict', 'drop_usd', 'fees_usd', 'net_usd', 'net_per_hour', 'watchlist', 'candidate'];
 var lines = [head.join(',')].concat(rows.map(function (r) {
-return [r.rank, r.candidateRank, r.name, r.slug, r.category, r.chains.join('|'), r.tvl, r.ch7, r.age, r.odds, r.launch, r.implied, r.p25, r.p75, r.plan.verdict, r.plan.drop, r.plan.fees, r.plan.net, r.plan.perHour, r.watch, r.candidate].map(cell).join(',');
+return [r.candidateRank, r.candidateRank, r.name, r.slug, r.category, r.chains.join('|'), r.tvl, r.ch7, r.age, r.odds, r.launch, r.implied, r.p25, r.p75, r.plan.verdict, r.plan.drop, r.plan.fees, r.plan.net, r.plan.perHour, r.watch, r.candidate].map(cell).join(',');
 }));
 var blob = new Blob([lines.join('\n')], { type: 'text/csv' });
 var a = document.createElement('a');
@@ -473,7 +482,7 @@ var stats = el('div', 'statGrid');
 [
 ['Implied value', money(r.implied), 'launch ' + money(r.launch) + ' × ' + Math.round(r.odds * 100) + '% odds', true],
 ['If it launches', money(r.launch), 'if launched', false],
-['P25–P75', money(r.p25) + ' – ' + money(r.p75), 'half of held-out peers', false],
+['P25–P75', money(r.p25) + ' – ' + money(r.p75), 'launch band; ' + Math.round(R.model.value.coverage.outerP25 * 100) + '% blind', false],
 ['TVL', money(r.tvl), pct(r.ch7) + ' over 7 days', false]
 ].forEach(function (s) {
 var d = el('div', 'stat');
@@ -550,7 +559,7 @@ var vh = el('div', 'verdictHead');
 vh.appendChild(el('span', 'verdict v-' + r.plan.verdict, r.plan.verdict.toUpperCase()));
 vh.appendChild(el('b', null, '$' + f.net.toFixed(0) + ' expected · $' + f.perHour.toFixed(0) + ' per hour'));
 right.appendChild(vh);
-right.appendChild(el('p', 'muted', 'If it launches: $' + r.plan.launchNet.toFixed(0) + ' net. Breaks even at ' + (Number.isFinite(r.plan.breakevenDeposit) ? '$' + r.plan.breakevenDeposit.toFixed(0) + ' deposit' : 'no deposit size') + ' or ' + (Number.isFinite(r.plan.breakevenOdds) ? Math.round(r.plan.breakevenOdds * 100) + '%' : '—') + ' odds.'));
+right.appendChild(el('p', 'muted', 'If it launches: $' + r.plan.launchNet.toFixed(0) + ' net. ' + (Number.isFinite(r.plan.breakevenDeposit) ? 'Breaks even at $' + r.plan.breakevenDeposit.toFixed(0) + ' deposit or ' + (r.plan.breakevenOdds <= 1 ? Math.round(r.plan.breakevenOdds * 100) + '%' : '>100%') + ' odds.' : 'Never beats the T-bill at any size; needs >100% odds.') + ' At P25: ' + r.plan.p25Verdict + ' (' + money(r.plan.p25Net) + ').'));
 var share = el('table', 'mini shareTable');
 var sh = el('thead');
 var shr = el('tr');
@@ -674,7 +683,7 @@ tr.appendChild(el('td', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'tested, dropp
 tr.title = t.note;
 ot.appendChild(tr);
 });
-$('#rangeText').textContent = 'P25–P75 ran ' + v.bands.p25.toFixed(2) + '× to ' + v.bands.p75.toFixed(2) + '× of the point estimate and covered ' + Math.round(v.coverage.p25 * 100) + '% of the ' + v.coverage.n + ' residuals that set the bands; P10–P90 ran ' + v.bands.p10.toFixed(2) + '× to ' + v.bands.p90.toFixed(2) + '× and covered ' + Math.round(v.coverage.p10 * 100) + '%. Outer folds 48/77; in-sample 50/80.';
+$('#rangeText').textContent = 'P25–P75 ran ' + v.bands.p25.toFixed(2) + '× to ' + v.bands.p75.toFixed(2) + '× of the point estimate and covered ' + Math.round(v.coverage.p25 * 100) + '% of the ' + v.coverage.n + ' residuals that set the bands; P10–P90 ran ' + v.bands.p10.toFixed(2) + '× to ' + v.bands.p90.toFixed(2) + '× and covered ' + Math.round(v.coverage.p10 * 100) + '%. Outer folds 48/77; in-sample 50/80. Coverage is measured on launch value; expected value applies odds.';
 var rr = $('#rangeRow');
 rr.replaceChildren();
 [['Held out', v.coverage.n, 'live-token protocols'], ['P25–P75', Math.round(v.coverage.p25 * 100) + '%', 'covered'], ['P10–P90', Math.round(v.coverage.p10 * 100) + '%', 'covered']].forEach(function (s) {

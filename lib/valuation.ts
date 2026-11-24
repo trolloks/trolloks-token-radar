@@ -501,7 +501,7 @@ const farmPlan = (p: Protocol, launch: number, odds: number, age: number | null,
   const hurdle = BENCHMARK_RATE * (weeks / 52);
   const perDollar = expected * DROP_SHARE / p.tvl;
   const breakevenDeposit = perDollar > hurdle ? round(fees / (perDollar - hurdle), 2) : Infinity;
-  const breakevenOdds = launchDrop > 0 ? round(Math.min(1, (benchmark + fees) / launchDrop), 4) : Infinity;
+  const breakevenOdds = launchDrop > 0 ? round((benchmark + fees) / launchDrop, 4) : Infinity;
   const steps: PlanStep[] = [
     { action: `Fund a fresh wallet with $${planSize.toLocaleString('en-US')} plus about $${fees} for fees; keep the seed offline.`, cost: `$${planSize.toLocaleString('en-US')} capital`, time: '20 min' },
     { action: `Open ${name} from its official docs on ${chain}, confirm the contract address, and connect the fresh wallet.`, cost: `~$${gas} gas`, time: '10 min' },
@@ -678,7 +678,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
   const scored = pre.map((p) => {
     const oddsRow = oddsRows.find((r) => r.p === p)!;
     const launch = Math.max(1, Math.round(value.predict(p)));
-    const odds = oddsModel.predict(oddsRow);
+    const odds = round(oddsModel.predict(oddsRow), 3);
     const implied = Math.max(1, Math.round(launch * odds));
     const age = ageDays(p, snapshot.asOf);
     const whyNot = exclusion(p);
@@ -754,8 +754,8 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
 
   const checksum = (() => {
     let h = 2166136261;
-    for (const r of rows) {
-      const s = `${r.slug}|${r.rank}|${r.implied}`;
+    for (const r of rows.filter((r) => r.candidate)) {
+      const s = `${r.slug}|${r.candidateRank}|${r.implied}`;
       for (let i = 0; i < s.length; i++) {
         h ^= s.charCodeAt(i);
         h = Math.imul(h, 16777619) >>> 0;

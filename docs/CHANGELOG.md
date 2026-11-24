@@ -193,5 +193,8 @@ Rebuilt the model to the standard the leader's public artifact showed:
   deposit, and a one-line if-it-launches net.
 - Remove the separate farm planner tab; the fourth screenshot is now the method
   and tests page. The board is compact enough for eight rows at 1280x1024.
-- Gate: dashboard source 63,0xx / 65,536; dossier text under cap; verify.mjs all
-  pass; not submitted. The final pick remains v5 at 942,846.
+- `board.json` is now the 198 candidates only, with candidate ranks; the 342-row UI keeps
+  the set-aside records for filters. Accounting groups are mutually exclusive and sum 758.
+  The integrity row checks board, data, ranks, watchlist and checksum; all pass.
+- Gate: dashboard source 64,123 / 65,536; dossier text under cap; verify.mjs all pass;
+  not submitted. The final pick remains v5 at 942,846.
