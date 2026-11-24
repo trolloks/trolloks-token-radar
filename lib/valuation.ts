@@ -101,6 +101,9 @@ export interface Row {
     net: number;
     perHour: number;
     benchmark: number;
+    p25Drop: number;
+    p25Net: number;
+    p25Verdict: 'worth' | 'marginal' | 'skip';
     verdict: 'worth' | 'marginal' | 'skip';
   };
   note: string;
@@ -394,7 +397,7 @@ const oddsWalkForward = (rows: OddsRow[], terms: OddsTerm[], baseRate: number): 
 // ------------------------------------------------------------------ farm plans
 
 const CATEGORY_ACTION: [RegExp, string][] = [
-  [/lend|cdp|borrow|collateral|stable/i, 'Supply USDC and borrow USDT against it at 50% LTV or less'],
+  [/lend|cdp|borrow|collateral|stable/i, 'Supply USDC and take the receipt token; keep the position under 50% LTV'],
   [/dex|amm|swap/i, 'Provide liquidity in the deepest USDC pair and stake the LP receipt if the protocol allows'],
   [/liquid staking|staking|restak/i, 'Stake the chain native asset and hold the receipt token'],
   [/bridge|canonical|cross chain/i, 'Bridge USDC in, do one swap, then bridge the remainder back'],
@@ -435,7 +438,7 @@ const gasFor = (p: Protocol): number => {
 
 const actionFor = (p: Protocol): string => (CATEGORY_ACTION.find(([re]) => re.test(p.category ?? '')) ?? [null, GENERIC_ACTION])[1]!;
 
-const farmPlan = (p: Protocol, implied: number, age: number | null, candidate: boolean, whyNot: string | null, odds: number): Row['plan'] => {
+const farmPlan = (p: Protocol, implied: number, age: number | null, candidate: boolean, whyNot: string | null, odds: number, p25: number): Row['plan'] => {
   const weeks = age !== null && age < 180 ? 8 : 4;
   const gas = gasFor(p);
   const chain = clean(p.chains[0] ?? 'its main chain', 30);
@@ -449,7 +452,10 @@ const farmPlan = (p: Protocol, implied: number, age: number | null, candidate: b
   const planSize = PLAN_SIZE;
   const drop = Math.max(0, round(implied * DROP_SHARE * (planSize / p.tvl), 2));
   const net = round(drop - fees, 2);
-  const benchmark = round(planSize * BENCHMARK_RATE * (HORIZON_WEEKS / 52), 2);
+  const p25Drop = Math.max(0, round(p25 * DROP_SHARE * (planSize / p.tvl), 2));
+  const p25Net = round(p25Drop - fees, 2);
+  const benchmark = round(planSize * BENCHMARK_RATE * (weeks / 52), 2);
+  const p25Verdict: Row['plan']['verdict'] = p25Net > benchmark && odds >= 0.5 ? 'worth' : p25Net > 0 ? 'marginal' : 'skip';
   const verdict: Row['plan']['verdict'] = net > benchmark && odds >= 0.5 ? 'worth' : net > 0 ? 'marginal' : 'skip';
   const steps: PlanStep[] = [
     { action: `Fund a fresh wallet with $${planSize.toLocaleString('en-US')} plus about $${fees} for fees; keep the seed offline.`, cost: `$${planSize.toLocaleString('en-US')} capital`, time: '20 min' },
@@ -465,7 +471,7 @@ const farmPlan = (p: Protocol, implied: number, age: number | null, candidate: b
     if (step.action.length < 20) step.action = `${step.action} (confirm the terms first).`;
     if (step.action.length > 600) step.action = `${step.action.slice(0, 590)}...`;
   }
-  return { steps, capital: planSize, fees, hours, weeks, drop, net, perHour: round(net / Math.max(0.1, hours), 2), benchmark, verdict };
+  return { steps, capital: planSize, fees, hours, weeks, drop, net, perHour: round(net / Math.max(0.1, hours), 2), benchmark, p25Drop, p25Net, p25Verdict, verdict };
 };
 
 const CATEGORY_DD: [RegExp, string[]][] = [
@@ -628,6 +634,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     const whyNot = exclusion(p);
     const categoryRows = oddsRows.filter((r) => r.category === oddsRow.category);
     const categoryRate = (categoryRows.reduce((sum, r) => sum + r.y, 0) + 2 * baseRate) / (categoryRows.length + 2);
+    const p25 = Math.max(1, Math.round(implied * bands.p25));
     return {
       p,
       implied,
@@ -637,10 +644,10 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
       candidate: whyNot === null,
       low: Math.max(1, Math.round(implied * bands.p10)),
       high: Math.round(implied * bands.p90),
-      p25: Math.max(1, Math.round(implied * bands.p25)),
+      p25,
       p75: Math.round(implied * bands.p75),
       oddsInput: { size: oddsRow.size, age: oddsRow.age, growth: oddsRow.growth, chains: oddsRow.chains, categoryRate: round(categoryRate, 4) },
-      plan: farmPlan(p, implied, age, whyNot === null, whyNot, odds),
+      plan: farmPlan(p, implied, age, whyNot === null, whyNot, odds, p25),
     };
   });
   scored.sort((a, b) => b.implied - a.implied || (a.p.slug < b.p.slug ? -1 : 1));
@@ -665,8 +672,8 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
       high: s.high,
       p25: s.p25,
       p75: s.p75,
-      rankLow: 1 + scored.filter((o) => o.implied > s.p75).length,
-      rankHigh: scored.filter((o) => o.implied >= s.p25).length,
+      rankLow: 1 + scored.filter((o) => o.candidate && o.implied > s.p75).length,
+      rankHigh: scored.filter((o) => o.candidate && o.implied >= s.p25).length,
       odds: round(s.odds, 3),
       multiple: round(s.implied / s.p.tvl, 4),
       watch: watch.has(s.p.slug),
@@ -719,7 +726,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     source: snapshot.source,
     floor: snapshot.floor,
     model: {
-      name: 'radar-v15 fitted size curve + shrunk category + token odds',
+      name: 'radar-v16 fitted size curve + shrunk category + token odds',
       value: valueCheck,
       odds: oddsCheck,
       livePeers: live.length,

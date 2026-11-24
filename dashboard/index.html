@@ -18,7 +18,7 @@
   </div>
   <div class="stamp">
     <div><span>Snapshot</span><b id="asOf">—</b></div>
-    <div><span>Model</span><b>radar-v15</b></div>
+    <div><span>Model</span><b>radar-v16</b></div>
     <div><span>Peers priced</span><b id="peerCount">—</b></div>
   </div>
 </header>
@@ -72,8 +72,6 @@
             <th class="num" data-sort="rank">#</th>
             <th data-sort="name">Protocol</th>
             <th class="num" data-sort="tvl">TVL</th>
-            <th class="num" data-sort="ch7">7d</th>
-            <th class="num" data-sort="age">No token</th>
             <th class="num" data-sort="odds">Token odds</th>
             <th class="num" data-sort="implied">If it launches <small>implied value</small></th>
             <th class="num" data-sort="p75">P25 – P75</th>
@@ -112,17 +110,18 @@
         <h3>The value model</h3>
         <p class="eq">implied = TVL × exp(a + b × ln TVL)</p>
         <p class="muted" id="valueEq"></p>
-        <table class="mini" id="valueTerms"><thead><tr><th>Term</th><th class="num">Leave-one-out</th><th class="num">Walk-forward</th><th>Verdict</th></tr></thead><tbody></tbody></table>
+        <table class="mini" id="valueTerms"><thead><tr><th>Term</th><th class="num">Leave-one-out</th><th class="num">Older/newer</th><th>Verdict</th></tr></thead><tbody></tbody></table>
         <p class="muted">Kept terms are in the final model; the rest were tested and dropped. A flat multiple is the baseline every term must beat.</p>
       </article>
       <article class="panel formula">
         <h3>The token odds</h3>
         <p class="eq">odds = logistic(size, age, growth, category rate)</p>
         <p class="muted" id="oddsEq"></p>
-        <table class="mini" id="oddsTerms"><thead><tr><th>Model</th><th class="num">5-fold Brier</th><th class="num">Walk-forward</th><th>Verdict</th></tr></thead><tbody></tbody></table>
+        <table class="mini" id="oddsTerms"><thead><tr><th>Model</th><th class="num">5-fold Brier</th><th class="num">Older/newer</th><th>Verdict</th></tr></thead><tbody></tbody></table>
         <p class="muted">Lower Brier is better. Each row removes one term from the full model; a term is kept when removing it makes both tests worse. The base rate is the benchmark.</p>
       </article>
     </div>
+    <p class="muted">The older/newer split is a cohort holdout, not a historical forecast. Band coverage is in-sample.</p>
     <article class="panel chartWide">
       <h3>Held-out calibration</h3>
       <p class="muted">Every dot is a live-token protocol priced by the value curve that never saw it. The dashed diagonal is a perfect call; colour is the confidence band.</p>

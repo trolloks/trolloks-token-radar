@@ -141,3 +141,28 @@ Rebuilt the model to the standard the leader's public artifact showed:
   verify.mjs all pass. Earlier v8-v13 experiments moved the term tables onto the cover,
   cut plans to a $5K minimum and scored 911,184 (v13), below v5's 942,846; v15 reverts to
   the clean cover and the larger plans.
+
+### v16, 2026-11-24 — review fixes: evidence, cover, planner, honesty
+
+- Add `dashboard/evidence.json` to the dossier: model coefficients, value term
+  tests, Brier scores, sample counts and a worked Loopscale farm calculation. The
+  judge can now read the numbers behind the screens. Correct the stale README
+  formula, which still described growth x maturity as the value model.
+- Cover keeps seven rows and now shows the whole decision: protocol, TVL with 7-day
+  change, token odds, implied value, P25-P75, farm verdict and net/hour. The two
+  duplicate columns (`7d`, `No token`) fold into the TVL and protocol sublines.
+- Rank ranges leave the board. The detail labels them candidate-only sensitivity
+  ranges with other estimates fixed; they previously counted all 342 records, so
+  177 of 198 candidates showed a range past 198.
+- Planner sums active hours (15.6 h, not the 2.6 h maximum), shows $22/hour rather
+  than $151/hour, selects worth rows first and only says WORTH when every selected
+  row is worth. The six shown farms are all worth.
+- Farm verdicts compare against the plan's own 4/8-week hold, not a 12-week
+  benchmark; duplicate lending borrow instructions are removed; the detail
+  discloses gas-only net, unpriced protocol fees/borrow interest and P25 net
+  ($29 vs $31 T-bill for the Loopscale example).
+- Rename the walk-forward split to an older/newer listing holdout and label band
+  coverage as in-sample residuals, not an outer-fold test. No outer-fold test was
+  added; the method page says so.
+- Gate: dashboard source 65,138 / 65,536; dossier text 65,485; four 1280x1024
+  screenshots; verify.mjs all pass.
