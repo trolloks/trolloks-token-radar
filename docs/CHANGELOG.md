@@ -132,6 +132,8 @@ Rebuilt the model to the standard the leader's public artifact showed:
   hour at $10K.
 - Detail adds the rank range (P25-P75) and the category adjustment in the formula; the
   sandbox reprices the launch with the same category adjustment as the row.
+- Submitted 2026-11-24: submission `01a20c50-44bc-7244-9684-d6775e90900e`, receipt
+  06:48:36Z, commit `dbae43b`, bundle `9b22db46`. Checks passed, 82.9% authored.
 - Gate: dashboard source 63,828 / 65,536; dossier text 64,097; four 1280x1024 screenshots;
   verify.mjs all pass. Earlier v8-v13 experiments moved the term tables onto the cover,
   cut plans to a $5K minimum and scored 911,184 (v13), below v5's 942,846; v15 reverts to
