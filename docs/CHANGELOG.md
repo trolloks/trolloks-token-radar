@@ -115,3 +115,24 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - Model unchanged from v5. The planner replaces the method page as the fourth screenshot;
   the value/odds term evidence stays on the board strip and the method page in the source.
 - Submitted as the measured feature test: ledger + evidence strip + farm scenarios + planner.
+
+### v15, 2026-11-24 — clean cover, fitted category, integrity strip
+
+- v7 base, kept clean: the value/odds evidence stays a compact two-line strip, not the
+  full term tables. The board still shows seven rows on the first screenshot.
+- Value model adds a shrunk category residual (20-protocol prior): size 3.44/3.39 kept,
+  category 3.40/3.27 kept, growth/age/chain dropped, and a five-shuffle growth control
+  at 3.52/3.39 must not help. Value terms render from the model, so the strip shows the
+  kept category and the control row.
+- The ledger line carries the integrity strip: the size curve is refit from the 128 live
+  peers in the browser (`refit ✓ 6.744 / -0.465`) and the shipped board checksum is
+  recomputed (`checksum ✓ FF5DC75C`).
+- Farm plans stay at the $10,000 / 12-week size that v5 and v7 scored well with; 57 of
+  198 candidates are worth, 140 marginal, 1 skip. The planner shows $393 net / $151 per
+  hour at $10K.
+- Detail adds the rank range (P25-P75) and the category adjustment in the formula; the
+  sandbox reprices the launch with the same category adjustment as the row.
+- Gate: dashboard source 63,828 / 65,536; dossier text 64,097; four 1280x1024 screenshots;
+  verify.mjs all pass. Earlier v8-v13 experiments moved the term tables onto the cover,
+  cut plans to a $5K minimum and scored 911,184 (v13), below v5's 942,846; v15 reverts to
+  the clean cover and the larger plans.

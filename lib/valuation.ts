@@ -76,11 +76,14 @@ export interface Row {
   ch7: number | null;
   listed: string | null;
   age: number | null;
+  categoryAdj: number;
   implied: number;
   low: number;
   high: number;
   p25: number;
   p75: number;
+  rankLow: number;
+  rankHigh: number;
   odds: number;
   multiple: number;
   watch: boolean;
@@ -146,6 +149,8 @@ export interface Radar {
   };
   rows: Row[];
   live: LivePeer[];
+  checksum: string;
+  checks?: { source: number; shots: number; gate: string };
 }
 
 const DAY = 86_400_000;
@@ -229,10 +234,13 @@ type ValueTerm = 'size' | 'category' | 'growth' | 'age' | 'chains';
 
 interface ValueFit {
   predict: (p: Protocol) => number;
+  categoryAdj: (p: Protocol) => number;
   coef: number[];
 }
 
-const valueVector = (p: Protocol, terms: ValueTerm[], categories: string[]): number[] => {
+const CATEGORY_SHRINK = 20;
+
+const valueVector = (p: Protocol, terms: ValueTerm[]): number[] => {
   const x: number[] = [1];
   for (const t of terms) {
     if (t === 'size') x.push(Math.log(p.tvl));
@@ -240,19 +248,19 @@ const valueVector = (p: Protocol, terms: ValueTerm[], categories: string[]): num
     else if (t === 'age') x.push(Math.log(1 + (ageDays(p, AS_OF) ?? 365) / 365));
     else if (t === 'chains') x.push(Math.min(p.chains.length, 10));
   }
-  if (terms.includes('category')) for (const c of categories.slice(1)) x.push((p.category ?? '') === c ? 1 : 0);
   return x;
 };
 
 let AS_OF = '1970-01-01';
 
+/** Size curve plus a heavily shrunk category residual (n / (n + 20) of the category median). */
 const fitValue = (rows: Protocol[], terms: ValueTerm[]): ValueFit => {
-  const categories = terms.includes('category') ? [...new Set(rows.map((p) => p.category ?? ''))].sort() : [];
-  const cols = valueVector(rows[0]!, terms, categories).length;
+  const linear = terms.filter((t) => t !== 'category');
+  const cols = valueVector(rows[0]!, linear).length;
   const A = Array.from({ length: cols }, () => Array<number>(cols).fill(0));
   const b = Array<number>(cols).fill(0);
   for (const p of rows) {
-    const x = valueVector(p, terms, categories);
+    const x = valueVector(p, linear);
     const y = Math.log(p.mcap! / p.tvl);
     for (let i = 0; i < cols; i++) {
       b[i] += x[i]! * y;
@@ -261,13 +269,26 @@ const fitValue = (rows: Protocol[], terms: ValueTerm[]): ValueFit => {
   }
   for (let i = 0; i < cols; i++) A[i]![i] += RIDGE;
   const coef = solve(A, b);
-  return {
-    coef,
-    predict: (p) => {
-      const x = valueVector(p, terms, categories);
-      return p.tvl * Math.exp(x.reduce((s, v, i) => s + v * (coef[i] ?? 0), 0));
-    },
+  const base = (p: Protocol): number => {
+    const x = valueVector(p, linear);
+    return p.tvl * Math.exp(x.reduce((sum, v, i) => sum + v * (coef[i] ?? 0), 0));
   };
+  const byCategory = new Map<string, number[]>();
+  for (const p of rows) {
+    const c = p.category ?? '';
+    const list = byCategory.get(c) ?? [];
+    list.push(Math.log(p.mcap! / base(p)));
+    byCategory.set(c, list);
+  }
+  const categoryMedian = new Map<string, number>();
+  for (const [c, list] of byCategory) categoryMedian.set(c, median(list));
+  const categoryAdj = (p: Protocol): number => {
+    if (!terms.includes('category')) return 0;
+    const c = p.category ?? '';
+    const n = (byCategory.get(c) ?? []).length;
+    return (n / (n + CATEGORY_SHRINK)) * (categoryMedian.get(c) ?? 0);
+  };
+  return { coef, categoryAdj, predict: (p) => base(p) * Math.exp(categoryAdj(p)) };
 };
 
 const medianFactor = (pairs: [number, number][]): number => median(pairs.map(([est, actual]) => Math.max(est / actual, actual / est)));
@@ -421,18 +442,19 @@ const farmPlan = (p: Protocol, implied: number, age: number | null, candidate: b
   const name = clean(p.name, 50);
   const weekly = Math.max(0.5, gas / 4);
   const exit = Math.max(1, gas / 2);
-  const fees = round(gas * 2 + weekly * weeks + exit, 2);
+  const fees = round(gas * 3 + weekly * weeks + exit, 2);
   const hours = round((20 + 10 + 15 + 10 + weeks * 15 + 10 + 30) / 60, 1);
   const action = actionFor(p);
   const variant = (PLAN_VARIANT.find(([re]) => re.test(p.category ?? '')) ?? [null, GENERIC_VARIANT])[1]!;
-  const drop = Math.max(0, round(implied * DROP_SHARE * (PLAN_SIZE / p.tvl), 2));
+  const planSize = PLAN_SIZE;
+  const drop = Math.max(0, round(implied * DROP_SHARE * (planSize / p.tvl), 2));
   const net = round(drop - fees, 2);
-  const benchmark = round(PLAN_SIZE * BENCHMARK_RATE * (HORIZON_WEEKS / 52), 2);
+  const benchmark = round(planSize * BENCHMARK_RATE * (HORIZON_WEEKS / 52), 2);
   const verdict: Row['plan']['verdict'] = net > benchmark && odds >= 0.5 ? 'worth' : net > 0 ? 'marginal' : 'skip';
   const steps: PlanStep[] = [
-    { action: `Fund a fresh wallet with $${PLAN_SIZE.toLocaleString('en-US')} plus about $${fees} for fees; keep the seed offline.`, cost: `$${PLAN_SIZE.toLocaleString('en-US')} capital`, time: '20 min' },
+    { action: `Fund a fresh wallet with $${planSize.toLocaleString('en-US')} plus about $${fees} for fees; keep the seed offline.`, cost: `$${planSize.toLocaleString('en-US')} capital`, time: '20 min' },
     { action: `Open ${name} from its official docs on ${chain}, confirm the contract address, and connect the fresh wallet.`, cost: `~$${gas} gas`, time: '10 min' },
-    { action: `${action} with $${PLAN_SIZE.toLocaleString('en-US')}; read the fee and withdrawal terms before signing.`, cost: `~$${gas} gas + protocol fee`, time: '15 min' },
+    { action: `${action} with $${planSize.toLocaleString('en-US')}; read the fee and withdrawal terms before signing.`, cost: `~$${gas} gas + protocol fee`, time: '15 min' },
     { action: `${variant.middle}.`, cost: `~$${gas} gas`, time: '10 min' },
     { action: `Do one qualifying action a week for ${weeks} weeks - deposit, borrow, swap or vote - and keep leverage low.`, cost: `~$${weekly} gas/week`, time: `${weeks * 15} min total` },
     { action: `Record wallet, tx hashes, dates and the protocol's TVL in a sheet; re-check eligibility only on the protocol's own site.`, cost: '$0', time: '10 min/month' },
@@ -443,7 +465,7 @@ const farmPlan = (p: Protocol, implied: number, age: number | null, candidate: b
     if (step.action.length < 20) step.action = `${step.action} (confirm the terms first).`;
     if (step.action.length > 600) step.action = `${step.action.slice(0, 590)}...`;
   }
-  return { steps, capital: PLAN_SIZE, fees, hours, weeks, drop, net, perHour: round(net / Math.max(0.1, hours), 2), benchmark, verdict };
+  return { steps, capital: planSize, fees, hours, weeks, drop, net, perHour: round(net / Math.max(0.1, hours), 2), benchmark, verdict };
 };
 
 const CATEGORY_DD: [RegExp, string[]][] = [
@@ -479,28 +501,56 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
   const live = snapshot.protocols.filter((p) => !isPreToken(p) && p.mcap !== null && p.mcap > 0 && p.tvl > 0);
   const watch = new Set(snapshot.watchlist);
 
-  // value model: flat baseline, then each term added to size; keep only size
+  // value model: terms added in order, kept only when both blind tests improve
   const baselineLoo = valueLoo(live, []);
   const baselineWf = valueWalkForward(live, []);
-  const valueTerms: { term: ValueTerm; label: string; note: string }[] = [
-    { term: 'size', label: 'size curve (log TVL)', note: 'kept: sharpest cut in both tests' },
-    { term: 'category', label: 'category effect', note: 'not kept: improves walk-forward but worsens leave-one-out' },
-    { term: 'growth', label: '7-day TVL growth', note: 'not kept: worse in both tests; enters through the odds model' },
-    { term: 'age', label: 'log age', note: 'not kept: worse in both tests; enters through the odds model' },
-    { term: 'chains', label: 'chain count', note: 'not kept: no improvement in either test' },
+  const valueTermChecks: TermCheck[] = [
+    { term: 'flat median multiple (baseline)', loo: round(baselineLoo, 3), wf: round(baselineWf, 3), kept: false, note: 'baseline: no value term' },
   ];
-  const valueTermChecks: TermCheck[] = valueTerms.map((t) => {
-    const terms: ValueTerm[] = t.term === 'size' ? ['size'] : ['size', t.term];
+  const sizeLoo = valueLoo(live, ['size']);
+  const sizeWf = valueWalkForward(live, ['size']);
+  valueTermChecks.push({ term: 'size curve (log TVL)', loo: round(sizeLoo, 3), wf: round(sizeWf, 3), kept: true, note: 'kept: sharpest cut in both tests' });
+  const kept: ValueTerm[] = ['size'];
+  let keptLoo = sizeLoo;
+  let keptWf = sizeWf;
+  const categoryLoo = valueLoo(live, ['size', 'category']);
+  const categoryWf = valueWalkForward(live, ['size', 'category']);
+  const categoryKept = categoryLoo <= keptLoo && categoryWf <= keptWf;
+  valueTermChecks.push({ term: 'category effect (shrunk)', loo: round(categoryLoo, 3), wf: round(categoryWf, 3), kept: categoryKept, note: 'kept only when both blind tests improve with a 20-protocol prior' });
+  if (categoryKept) {
+    kept.push('category');
+    keptLoo = categoryLoo;
+    keptWf = categoryWf;
+  }
+  const extraTerms: { term: ValueTerm; label: string; note: string }[] = [
+    { term: 'growth', label: '7-day TVL growth', note: 'kept only when both blind tests improve; enters the odds model either way' },
+    { term: 'age', label: 'log age', note: 'kept only when both blind tests improve; enters the odds model either way' },
+    { term: 'chains', label: 'chain count', note: 'kept only when both blind tests improve' },
+  ];
+  for (const extra of extraTerms) {
+    const terms: ValueTerm[] = [...kept, extra.term];
     const loo = valueLoo(live, terms);
     const wf = valueWalkForward(live, terms);
-    const kept = t.term === 'size';
-    return { term: t.label, loo: round(loo, 3), wf: round(wf, 3), kept, note: t.note };
+    const isKept = loo <= keptLoo && wf <= keptWf;
+    valueTermChecks.push({ term: extra.label, loo: round(loo, 3), wf: round(wf, 3), kept: isKept, note: extra.note });
+    if (isKept) {
+      kept.push(extra.term);
+      keptLoo = loo;
+      keptWf = wf;
+    }
+  }
+  const controlRuns = [37, 53, 71, 89, 107].map((shift) => {
+    const control = live.map((p, i) => ({ ...p, ch7: live[(i + shift) % live.length]?.ch7 ?? p.ch7 }));
+    return [valueLoo(control, [...kept, 'growth']), valueWalkForward(control, [...kept, 'growth'])] as [number, number];
   });
-  const value = fitValue(live, ['size']);
+  const controlLoo = median(controlRuns.map(([loo]) => loo));
+  const controlWf = median(controlRuns.map(([, wf]) => wf));
+  valueTermChecks.push({ term: 'control: 5 shuffled growths (must not help)', loo: round(controlLoo, 3), wf: round(controlWf, 3), kept: false, note: 'must not help: shuffled growth is noise' });
+  const value = fitValue(live, kept);
   const looResiduals: number[] = [];
   const looPairs: [number, number][] = [];
   for (let i = 0; i < live.length; i++) {
-    const model = fitValue(live.filter((_, j) => j !== i), ['size']);
+    const model = fitValue(live.filter((_, j) => j !== i), kept);
     const p = live[i]!;
     const est = model.predict(p);
     looPairs.push([est, p.mcap!]);
@@ -524,7 +574,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     intercept: round(intercept, 3),
     multipleAt100m: round(Math.exp(intercept + slope * Math.log(1e8)), 3),
     loo: round(medianFactor(looPairs), 3),
-    wf: round(valueWalkForward(live, ['size']), 3),
+    wf: round(valueWalkForward(live, kept), 3),
     baselineLoo: round(baselineLoo, 3),
     baselineWf: round(baselineWf, 3),
     bands,
@@ -609,11 +659,14 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
       ch7: s.p.ch7,
       listed: s.p.listed,
       age: s.age,
+      categoryAdj: round(value.categoryAdj(s.p), 6),
       implied: s.implied,
       low: s.low,
       high: s.high,
       p25: s.p25,
       p75: s.p75,
+      rankLow: 1 + scored.filter((o) => o.implied > s.p75).length,
+      rankHigh: scored.filter((o) => o.implied >= s.p25).length,
       odds: round(s.odds, 3),
       multiple: round(s.implied / s.p.tvl, 4),
       watch: watch.has(s.p.slug),
@@ -640,6 +693,18 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     }))
     .sort((a, b) => b.mcap - a.mcap);
 
+  const checksum = (() => {
+    let h = 2166136261;
+    for (const r of rows) {
+      const s = `${r.slug}|${r.rank}|${r.implied}`;
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619) >>> 0;
+      }
+    }
+    return h.toString(16).toUpperCase().padStart(8, '0');
+  })();
+
   const kindOf = (r: Row): 'cex' | 'bridge' | 'product' => {
     const category = r.category ?? '';
     if (category === 'CEX' || EXCHANGE_PREFIX.test(r.name)) return 'cex';
@@ -654,7 +719,7 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     source: snapshot.source,
     floor: snapshot.floor,
     model: {
-      name: 'radar-v5 fitted size curve + token odds',
+      name: 'radar-v15 fitted size curve + shrunk category + token odds',
       value: valueCheck,
       odds: oddsCheck,
       livePeers: live.length,
@@ -680,5 +745,6 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
     },
     rows,
     live: livePeers,
+    checksum,
   };
 };
