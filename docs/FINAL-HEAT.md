@@ -25,32 +25,18 @@ complete dev rating.
 | v7 | `01a2082f-f28f-737e-b47b-3664d79672c8` | 939,310 | 922,935 - 955,686 | not picked |
 | v8b | `4615746` | not submitted | - | fallback bundle `radar-v8b.tar.gz` |
 | v9 | `4689a8f` (branch `v9-category`) | not submitted | - | superseded by v9c |
-| v9c | `4c46abf` (branch `v9-category`) | scheduled 2026-11-24T00:00:30Z | pending | bundle `radar-v9c.tar.gz`; auto-pick if it beats v5 |
-| v10 | `41d044a` (branch `v10`) | cancelled 2026-11-23T15:19Z | cancelled | slot freed for v13; bundle `radar-v10.tar.gz` (18.99 MB) remains for reference |
-| v11 | `fd96b950` (branch `v11`) | scheduled 2026-11-24T00:10:30Z | pending | bundle `radar-v11.tar.gz` (19.71 MB); check overall true, 85.2% authored; codex planner/detail fixes; scheduler picks best of current and v11 |
-| v12 | `2f49c6e` (branch `v12`) | scheduled 2026-11-24T00:15:30Z | pending | per-protocol plan sizing with matching verdict/copy, both worth conditions, exact planner allocations, rank ranges, growth/age note, stack-naming title; bundle 22.69 MB; 85.5% authored; v13 takes the freed slot |
-| v13 | `89f8153` (branch `v13`) | scheduled 2026-11-24T00:25:30Z | pending | minimum-viable farm plans, cover checks, v12 base; bundle 23.64 MB; 85.7% authored; scheduler picks best of current and v13 |
+| v9c | `4c46abf` (branch `v9-category`) | not submitted | - | bundle lost with `/tmp`; superseded by v13 |
+| v10 | `41d044a` (branch `v10`) | cancelled 2026-11-23T15:19Z | cancelled | slot freed for v13; bundle lost with `/tmp` |
+| v11 | `fd96b950` (branch `v11`) | not submitted | - | bundle lost with `/tmp`; 85.2% authored; codex planner/detail fixes |
+| v12 | `2f49c6e` (branch `v12`) | not submitted | - | bundle lost with `/tmp`; 85.5% authored; superseded by v13 |
+| v13 | `01a20c27-114e-7778-ba0a-67ea930a1d60` (`89f8153`, branch `v13`) | submitted 2026-11-24T06:03:36Z | 911,184 (882,577-939,790) | minimum-viable farm plans, cover checks, v12 base; 12/12 wins; below v5; not picked |
 
-After v9c scores: pick the higher of v5 and v9c (or v8b if it is used) with
-`PUT /api/competitions/token-radar-01/final-entry`, or
-`node cli/makefun.mjs final token-radar-01 <submission id>`. A later entry does not replace
-the pick by itself. The armed scheduler `/tmp/opencode/submit-pick-v9c.sh` does this
-automatically: it submits v9c, polls its score, and pins it only if it exceeds 942,846.
-The v10 candidate (`41d044a`) was cancelled before its 00:05:30Z slot on 2026-11-23T15:19Z
-to free the last quota slot for v13; its bundle remains for reference.
-The v11 candidate (`fd96b950`, with the planner eligibility/headline and detail verdict
-fixes) is scheduled at 00:10:30Z; its scheduler
-(`/tmp/opencode/submit-pick-v11.sh`, PID 1392562) reads the current final entry's score at
-01:25Z and pins the best of the current/v11.
-The v12 candidate (`2f49c6e`, per-protocol plan sizing with a matching verdict and copy,
-both worth conditions, exact planner allocations, rank ranges, growth/age note, and a
-stack-naming title) is scheduled at 00:15:30Z; its scheduler
-(`/tmp/opencode/submit-pick-v12.sh`, PID 1517436) reads the current final entry's score at
-01:35Z and pins the best of the current/v12.
-The v13 candidate (`89f8153`, minimum-viable farm plans and cover checks on the v12 base)
-is scheduled at 00:25:30Z; its scheduler
-(`/tmp/opencode/submit-pick-v13.sh`, PID 1560552) reads the current final entry's score at
-01:45Z and pins the best of the current/v13. It uses the slot freed by v10.
+The 2026-11-24 00:00-00:25Z schedulers did not run: `/tmp/opencode` was cleared before
+they fired. v13 was rebuilt and submitted manually after the next UTC day opened. Its
+dev score is 911,184, 31,662 below v5, so v5 stays the final pick. A later entry does not
+replace the pick by itself: pick it with
+`PUT /api/competitions/token-radar-01/final-entry` or
+`node cli/makefun.mjs final token-radar-01 <submission id>` only if it beats 942,846.
 
 ## Pick strategy
 
@@ -63,8 +49,7 @@ pick can be changed with `PUT final-entry` until 2026-12-14T10:00Z.
 
 The final-entry rule is `Force_Last`, and the server honours an explicit pick under that
 rule (confirmed from the kit's `honoursPick` and the account status: the picked v5 counts
-instead of the later v7). Every scheduler re-pins the best after each submission, so the
-last of the four to run leaves the highest dev rate pinned.
+instead of the later v7). Re-pin the best after each submission; no scheduler is armed now.
 
 ## Final heat
 

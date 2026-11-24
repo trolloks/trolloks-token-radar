@@ -341,3 +341,11 @@ source/dossier cap:
 - Commit `89f8153`; bundle `6ea4ac7c...` (23,639,952 bytes); site check overall true,
   85.7% authored (2,238/2,610); title 175 chars; scheduled 2026-11-24T00:25:30Z, after
   v12; scheduler PID 1560552; picks at 01:45Z.
+- The 00:25Z scheduler and `/tmp` bundles were lost before they ran. Submitted v13
+  manually on 2026-11-24: submission `01a20c27-114e-7778-ba0a-67ea930a1d60`, receipt
+  06:03:36Z. The bundle was rebuilt from the same session and system prompt; checks all
+  passed, 85.7% authored.
+- Score: **911,184** (91.12%), interval 882,577-939,790, 12/12 wins, rank 611. The heat
+  stopped after 12 matches; v5 and v7 got 20. v13 is 31,662 below v5, so v5 stays the
+  final pick. The likely cause is the min-viable $5K farm plans and the dense term
+  tables on the board cover; the clean v5/v7 cover scored better.
