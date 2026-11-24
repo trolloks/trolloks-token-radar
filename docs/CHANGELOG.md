@@ -166,7 +166,8 @@ Rebuilt the model to the standard the leader's public artifact showed:
   added; the method page says so.
 - Submitted 2026-11-24: submission `01a20cbb-5485-77c2-93f7-b0e3b12291c9`, receipt
   08:45:33Z, commit `db68d5d`, bundle `2653a8ce`. Checks passed, 77.7% authored.
-- Development grading is in the site's backlog (`grading_backlog`, poll after 300 s). No
-  resubmission; v5 remains the pick until the score arrives.
+- Development grading was in the site's backlog, then finished: **936,619** (93.66%),
+  interval 919,810-953,428, 20/20 wins. This is below v5 (942,846) and v15 (940,200), so
+  the review fixes did not move the judge. v5 remains the pick; one entry is left.
 - Gate: dashboard source 65,138 / 65,536; dossier text 65,485; four 1280x1024
   screenshots; verify.mjs all pass.
