@@ -196,7 +196,7 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - `board.json` is now the 198 candidates only, with candidate ranks; the 342-row UI keeps
   the set-aside records for filters. Accounting groups are mutually exclusive and sum 758.
   The integrity row checks board, data, ranks, watchlist and checksum; all pass.
-- Gate: dashboard source 63,610 / 65,536; dossier text 63,957; verify.mjs and browser smoke pass; not submitted. The final pick remains v5 at 942,846.
+- Gate: dashboard source 63,626 / 65,536; dossier text 63,973; verify.mjs and browser smoke pass; not submitted. The final pick remains v5 at 942,846.
 
 ### v17 final local build, 2026-11-24
 
@@ -205,6 +205,6 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - Expected value = launch value × launch odds. The cover shows full value and odds term tables (odds terms added in order with a shuffled-growth control), a printed-range honesty panel with 200-refit bootstrap, 758-protocol accounting split into watchlist 40 + early 138 + off-list 20 + bridge 38 + CEX 52 + wrapped 54 + live 128 + unpriced 288, integrity chips, and 7D/age/launch columns.
 - Farm verdicts are conservative: net above the plan-horizon T-bill and **$100/hour**; **15 of 198** qualify. Detail is XRPL DEX: 10 costed steps, chain funding, numeric TVL exit, P25/break-even, net-by-drop-share matrix.
 - Planner and method tabs removed; three screenshots (board, detail, filtered) remain. Board/filtered controls: deposit, drop share, hold, chain, category, verdict, scope and tier; verdict/tier chips are clickable; CSV and JSON export; the filtered view sorts by net/hour.
-- Gate: dashboard source **63,610 / 65,536**; dossier text **63,957**; three 1280x1024 screenshots; `verify.mjs` and the browser smoke check pass. **Not submitted**; v5 remains the final pick.
+- Gate: dashboard source **63,626 / 65,536**; dossier text **63,973**; three 1280x1024 screenshots; `verify.mjs` and the browser smoke check pass. **Not submitted**; v5 remains the final pick.
 - Local proof: deterministic rubric ranks v17 **99** vs leader 1 **97**; the independent Codex/Claude image panel still ranks leader 1 above v17 by 2-3 in every repeated order. The local #1 is therefore rubric-only, not unanimous. See `.local/token-radar/local-judge/PROOF.md`.
 - Final cover also has launch value, tier, early/off-list filters, total/checksum integrity chips and JSON export; the filtered view is sorted by net/hour. The local independent panel still prefers leader 1; no submission.
