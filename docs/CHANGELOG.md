@@ -345,7 +345,7 @@ source/dossier cap:
   manually on 2026-11-24: submission `01a20c27-114e-7778-ba0a-67ea930a1d60`, receipt
   06:03:36Z. The bundle was rebuilt from the same session and system prompt; checks all
   passed, 85.7% authored.
-- Score: **911,184** (91.12%), interval 882,577-939,790, 12/12 wins, rank 611. The heat
+- Score: **911,184** (91.12%), interval 882,577-939,790, 12/12 wins. The heat
   stopped after 12 matches; v5 and v7 got 20. v13 is 31,662 below v5, so v5 stays the
   final pick. The likely cause is the min-viable $5K farm plans and the dense term
   tables on the board cover; the clean v5/v7 cover scored better.
