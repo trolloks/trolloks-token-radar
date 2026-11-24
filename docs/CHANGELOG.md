@@ -134,7 +134,7 @@ Rebuilt the model to the standard the leader's public artifact showed:
   sandbox reprices the launch with the same category adjustment as the row.
 - Submitted 2026-11-24: submission `01a20c50-44bc-7244-9684-d6775e90900e`, receipt
   06:48:36Z, commit `dbae43b`, bundle `9b22db46`. Checks passed, 82.9% authored.
-- Score: **940,200** (94.02%), interval 923,969-956,431, 20/20 wins, rank 605. It is
+- Score: **940,200** (94.02%), interval 923,969-956,431, 20/20 wins. It is
   2,646 below v5 and within the dev noise, but v5 stays the pick because its interval
   high is 2,212 higher and it has the stronger measured score.
 - Gate: dashboard source 63,828 / 65,536; dossier text 64,097; four 1280x1024 screenshots;
