@@ -173,7 +173,7 @@ vline.appendChild(el('b', null, 'Value LOO/WF '));
 v.terms.forEach(function (t, i) {
 if (i) vline.appendChild(document.createTextNode(' · '));
 vline.appendChild(document.createTextNode(t.term + ' ' + t.loo.toFixed(2) + '/' + t.wf.toFixed(2) + ' '));
-vline.appendChild(el('i', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'dropped'));
+vline.appendChild(el('i', t.kept ? 'up' : /baseline/.test(t.term) ? 'flat' : 'flat', t.kept ? 'kept' : /baseline/.test(t.term) ? 'baseline' : 'dropped'));
 });
 contract.appendChild(vline);
 var oline = el('div', 'evLine');
@@ -181,7 +181,7 @@ oline.appendChild(el('b', null, 'Odds Brier '));
 o.terms.forEach(function (t, i) {
 if (i) oline.appendChild(document.createTextNode(' · '));
 oline.appendChild(document.createTextNode(t.term + ' ' + t.loo.toFixed(3) + '/' + t.wf.toFixed(3) + ' '));
-oline.appendChild(el('i', t.kept ? 'up' : 'flat', t.kept ? 'kept' : 'base'));
+oline.appendChild(el('i', t.kept ? 'up' : 'flat', t.kept ? 'kept' : /base rate/.test(t.term) ? 'baseline' : 'base'));
 });
 contract.appendChild(oline);
 var cline = el('div', 'evLine');

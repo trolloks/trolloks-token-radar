@@ -196,5 +196,5 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - `board.json` is now the 198 candidates only, with candidate ranks; the 342-row UI keeps
   the set-aside records for filters. Accounting groups are mutually exclusive and sum 758.
   The integrity row checks board, data, ranks, watchlist and checksum; all pass.
-- Gate: dashboard source 64,123 / 65,536; dossier text under cap; verify.mjs all pass;
+- Gate: dashboard source 64,237 / 65,536; dossier text under cap; verify.mjs all pass;
   not submitted. The final pick remains v5 at 942,846.
