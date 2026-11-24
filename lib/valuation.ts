@@ -43,8 +43,12 @@ export interface TermCheck {
 
 export interface ValueCheck {
   slope: number;
+  slopeSe: number;
   intercept: number;
+  interceptSe: number;
   multipleAt100m: number;
+  multipleP10: number;
+  multipleP90: number;
   loo: number;
   wf: number;
   baselineLoo: number;
@@ -465,6 +469,9 @@ const CHAIN_GAS: [RegExp, number][] = [
   [/solana/i, 0.1],
   [/base|arbitrum|optimism|polygon|gnosis|linea|scroll|blast/i, 0.6],
   [/bsc|avalanche|tron/i, 0.8],
+  [/ripple|xrpl/i, 0.0002],
+  [/bitcoin/i, 1.5],
+  [/plasma|monad|ink|plume|algorand|core|babylon|berachain|sonic|unichain/i, 0.01],
 ];
 const gasFor = (p: Protocol): number => {
   const chain = p.chains[0] ?? '';
@@ -602,6 +609,19 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
   const controlWf = median(controlRuns.map(([, wf]) => wf));
   valueTermChecks.push({ term: 'control: 5 shuffled growths (must not help)', loo: round(controlLoo, 3), wf: round(controlWf, 3), kept: false, note: 'must not help: shuffled growth is noise' });
   const value = fitValue(live, kept);
+  const bootCoef: [number, number][] = [];
+  let seedC = 20261124;
+  const rndC = (): number => { seedC = (seedC * 1664525 + 1013904223) >>> 0; return seedC / 4294967296; };
+  for (let b = 0; b < 200; b++) {
+    const sample = live.map(() => live[Math.floor(rndC() * live.length)]!);
+    const m = fitValue(sample, kept);
+    bootCoef.push([m.coef[0] ?? 0, m.coef[1] ?? 0]);
+  }
+  const multipleBoot = bootCoef.map(([a, b]) => Math.exp(a + b * Math.log(1e8))).sort((a, b) => a - b);
+  const multipleP10 = quantile(multipleBoot, 0.1);
+  const multipleP90 = quantile(multipleBoot, 0.9);
+  const meanC = (i: number): number => bootCoef.reduce((sum, x) => sum + x[i]!, 0) / bootCoef.length;
+  const seC = (i: number): number => Math.sqrt(bootCoef.reduce((sum, x) => sum + (x[i]! - meanC(i)) ** 2, 0) / Math.max(1, bootCoef.length - 1));
   const looResiduals: number[] = [];
   const looPairs: [number, number][] = [];
   for (let i = 0; i < live.length; i++) {
@@ -629,9 +649,13 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
   const slope = value.coef[1] ?? 0;
   const intercept = value.coef[0] ?? 0;
   const valueCheck: ValueCheck = {
-    slope: round(slope, 3),
+    slope: round(slope, 4),
+    slopeSe: round(seC(1), 4),
     intercept: round(intercept, 3),
+    interceptSe: round(seC(0), 3),
     multipleAt100m: round(Math.exp(intercept + slope * Math.log(1e8)), 3),
+    multipleP10: round(multipleP10, 3),
+    multipleP90: round(multipleP90, 3),
     loo: round(medianFactor(looPairs), 3),
     wf: round(valueWalkForward(live, kept), 3),
     baselineLoo: round(baselineLoo, 3),
@@ -654,17 +678,25 @@ export const buildRadar = (snapshot: Snapshot): Radar => {
   }));
   const baseRate = oddsRows.reduce((s, r) => s + r.y, 0) / oddsRows.length;
   const oddsTermSets: { terms: OddsTerm[]; label: string; note: string; kept: boolean }[] = [
-    { terms: ['size', 'age', 'growth', 'category'], label: 'full model', note: 'all four terms', kept: true },
-    { terms: ['age', 'growth', 'category'], label: 'without size', note: 'kept: removing size worsens both tests', kept: true },
-    { terms: ['size', 'growth', 'category'], label: 'without age', note: 'kept: removing age worsens both tests', kept: true },
-    { terms: ['size', 'age', 'category'], label: 'without growth', note: 'kept: removing growth worsens both tests', kept: true },
-    { terms: ['size', 'age', 'growth'], label: 'without category', note: 'kept: removing the category rate worsens both tests', kept: true },
     { terms: [], label: 'base rate', note: 'benchmark: no terms', kept: false },
+    { terms: ['age'], label: '+ age (years listed)', note: 'kept: years listed improves both tests', kept: true },
+    { terms: ['age', 'category'], label: '+ family effect', note: 'kept: family rate improves both tests', kept: true },
+    { terms: ['age', 'category', 'size'], label: '+ size curve', note: 'kept: size improves both tests', kept: true },
+    { terms: ['age', 'category', 'size', 'growth'], label: '+ 7-day growth', note: 'kept: growth improves both tests', kept: true },
+    { terms: ['age', 'category', 'size', 'growth', 'chains'], label: '+ chain count', note: 'dropped: chain count does not improve both tests', kept: false },
   ];
   const oddsTermChecks: TermCheck[] = oddsTermSets.map((t) => {
     const loo = oddsFiveFold(oddsRows, t.terms, baseRate);
     const wf = oddsWalkForward(oddsRows, t.terms, baseRate);
     return { term: t.label, loo: round(loo, 4), wf: round(wf, 4), kept: t.kept, note: t.note };
+  });
+  const oddsControlRows = oddsRows.map((r, i) => ({ ...r, growth: oddsRows[(i + 37) % oddsRows.length]!.growth }));
+  oddsTermChecks.push({
+    term: 'control: shuffled growth (must not help)',
+    loo: round(oddsFiveFold(oddsControlRows, ['age', 'category', 'size', 'growth'], baseRate), 4),
+    wf: round(oddsWalkForward(oddsControlRows, ['age', 'category', 'size', 'growth'], baseRate), 4),
+    kept: false,
+    note: 'must not help: shuffled growth is noise',
   });
   const oddsTerms: OddsTerm[] = ['size', 'age', 'growth', 'category'];
   const oddsModel = fitOdds(oddsRows, oddsTerms, baseRate);

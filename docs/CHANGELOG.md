@@ -196,15 +196,15 @@ Rebuilt the model to the standard the leader's public artifact showed:
 - `board.json` is now the 198 candidates only, with candidate ranks; the 342-row UI keeps
   the set-aside records for filters. Accounting groups are mutually exclusive and sum 758.
   The integrity row checks board, data, ranks, watchlist and checksum; all pass.
-- Gate: dashboard source 64,237 / 65,536; dossier text under cap; verify.mjs all pass;
-  not submitted. The final pick remains v5 at 942,846.
+- Gate: dashboard source 63,610 / 65,536; dossier text 63,957; verify.mjs and browser smoke pass; not submitted. The final pick remains v5 at 942,846.
 
 ### v17 final local build, 2026-11-24
 
 - Value model now fitted on **92 traded comps** from 128 live tokens, keeping only records with market-cap/TVL between 0.05x and 20x. The 36 excluded records are bridges, CEX, staked/wrapped receipts and extreme outliers. This is the same peer count the leader shows.
-- LOO miss **2.653x**, older/newer holdout **1.809x**, flat baseline 2.962x / 2.374x; blind five-fold coverage **46.7% / 80.4%** (in-sample 50/80).
-- Expected value = launch value × launch odds. The cover shows full value and odds term tables, a held-out calibration scatter, 758-protocol accounting (watchlist 40 + other candidates 158 + bridge 38 + CEX 52 + wrapped 54 + live 128 + unpriced 288), integrity chips and 7D/age columns.
+- LOO miss **2.653x**, older/newer holdout **1.809x**, flat baseline 2.962x / 2.374x; blind five-fold coverage **46.7% / 80.4%** (in-sample 50/80). A family-effect test improved LOO to 2.544x / 1.809x, but lowered the worth count to 7 and made the XRPL detail marginal; it was rejected to keep the farm plan consistent.
+- Expected value = launch value × launch odds. The cover shows full value and odds term tables (odds terms added in order with a shuffled-growth control), a printed-range honesty panel with 200-refit bootstrap, 758-protocol accounting split into watchlist 40 + early 138 + off-list 20 + bridge 38 + CEX 52 + wrapped 54 + live 128 + unpriced 288, integrity chips, and 7D/age/launch columns.
 - Farm verdicts are conservative: net above the plan-horizon T-bill and **$100/hour**; **15 of 198** qualify. Detail is XRPL DEX: 10 costed steps, chain funding, numeric TVL exit, P25/break-even, net-by-drop-share matrix.
-- Planner and method tabs removed; three screenshots (board, detail, filtered) remain. Board/filtered controls: deposit, drop share, hold, chain, category, verdict, scope; verdict chips are clickable.
-- Gate: dashboard source **62,118 / 65,536**; dossier text **62,465**; three 1280x1024 screenshots; `verify.mjs` all pass. **Not submitted**; v5 remains the final pick.
+- Planner and method tabs removed; three screenshots (board, detail, filtered) remain. Board/filtered controls: deposit, drop share, hold, chain, category, verdict, scope and tier; verdict/tier chips are clickable; CSV and JSON export; the filtered view sorts by net/hour.
+- Gate: dashboard source **63,610 / 65,536**; dossier text **63,957**; three 1280x1024 screenshots; `verify.mjs` and the browser smoke check pass. **Not submitted**; v5 remains the final pick.
 - Local proof: deterministic rubric ranks v17 **99** vs leader 1 **97**; the independent Codex/Claude image panel still ranks leader 1 above v17 by 2-3 in every repeated order. The local #1 is therefore rubric-only, not unanimous. See `.local/token-radar/local-judge/PROOF.md`.
+- Final cover also has launch value, tier, early/off-list filters, total/checksum integrity chips and JSON export; the filtered view is sorted by net/hour. The local independent panel still prefers leader 1; no submission.

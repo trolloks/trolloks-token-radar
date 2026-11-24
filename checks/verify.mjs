@@ -1,6 +1,7 @@
 // Local gate audit for the token-radar entry: node checks/verify.mjs <snapshot.json> <output dir>
 // Mirrors the seven sealed scorer rows and refuses to print PASS while any invariant is broken.
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, extname, basename } from 'node:path';
 
 const [snapFile, outDir] = process.argv.slice(2);
@@ -19,6 +20,13 @@ const ok = (condition, label, detail) => {
   if (!condition) fails += 1;
 };
 const fmt = new Intl.NumberFormat('en-US');
+
+try {
+  execFileSync(process.execPath, ['--check', join(outDir, 'dashboard', 'app.js')], { stdio: 'pipe' });
+  ok(true, 'dashboard app.js parses');
+} catch (error) {
+  ok(false, 'dashboard app.js parses', String(error).slice(0, 160));
+}
 
 // --- board_file -------------------------------------------------------------------------------
 ok(Array.isArray(board) && board.length >= 100 && board.length <= 4000, 'board rows 100..4000', fmt.format(board.length));

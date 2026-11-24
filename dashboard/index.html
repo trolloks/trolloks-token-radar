@@ -50,6 +50,8 @@
         <option value="candidates">Launch candidates</option>
         <option value="worth">Worth farming</option>
         <option value="watch">Watchlist only</option>
+        <option value="early">Early (&lt;$50M)</option>
+        <option value="offlist">Off-list ($50M+)</option>
         <option value="pinned">Shortlist only</option>
         <option value="all">All pre-token records</option>
       </select></label>
@@ -65,19 +67,21 @@
         <span><i class="dot v-worth"></i>Worth</span><span><i class="dot v-marginal"></i>Marginal</span><span><i class="dot v-skip"></i>Skip</span>
         <span class="sep"></span><span><i class="chip sample watch">WATCH</i> on the snapshot watchlist</span>
       </div>
-      <div class="subActions"><button type="button" id="csv" class="ghost">Export CSV</button><button type="button" id="reset" class="ghost">Reset</button></div>
+      <div class="subActions"><button type="button" id="csv" class="ghost">Export CSV</button><button type="button" id="json" class="ghost">JSON</button><button type="button" id="reset" class="ghost">Reset</button></div>
     </div>
     <div class="tableWrap">
       <table id="table">
         <thead>
           <tr>
             <th class="starcol" title="Shortlist">&#9734;</th>
+            <th class="tiercol">Tier</th>
             <th class="num" data-sort="rank"># <small>range</small></th>
             <th data-sort="name">Protocol</th>
             <th class="num" data-sort="tvl">TVL</th>
             <th class="num" data-sort="ch7">7D</th>
             <th class="num" data-sort="age">No token</th>
             <th class="num" data-sort="odds">Token odds</th>
+            <th class="num" data-sort="launch">If it launches</th>
             <th class="num" data-sort="implied">Implied value <small>launch × odds</small></th>
             <th class="num" data-sort="p75">P25 – P75</th>
             <th data-sort="verdict">Farm</th>
