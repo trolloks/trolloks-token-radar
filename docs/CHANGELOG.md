@@ -171,3 +171,27 @@ Rebuilt the model to the standard the leader's public artifact showed:
   the review fixes did not move the judge. v5 remains the pick; one entry is left.
 - Gate: dashboard source 65,138 / 65,536; dossier text 65,485; four 1280x1024
   screenshots; verify.mjs all pass.
+
+### v17, 2026-11-24 — expected-value ranking and blind evidence (built, not submitted)
+
+- Rank by `implied = launch value × launch odds`. The board shows both numbers:
+  the expected value in amber and the conditional launch value underneath. This
+  moves Sentora from #1 to #17 on our model and puts USD, Polymarket, Veda and
+  Bittensor at the top; the top public entries rank by the same combined metric.
+- Value model stays the fitted log-TVL size curve plus shrunk category; the odds
+  model stays the logistic on size, age, growth and category (Brier 0.213).
+- Add a real blind range test: five outer folds fit the model and bands on the
+  training rows, then measure coverage on the held-out fold. Blind coverage is
+  **48.4% / 77.3%** against the stated 50/80, shown on the cover and method page.
+- Add a visible integrity row: rows ✓ 342, ranks ✓, watchlist 40/40, checksum
+  ✓ E05E29BA, plus the refit line.
+- Add named protocol accounting chips (watchlist 40, below floor 302, live 128,
+  unpriced 288, set aside 144) and farm verdict count chips (All 198, Worth 91,
+  Marginal 72, Skip 35).
+- Detail page now shows launch value and expected value separately, nearest
+  traded peers, a position table, a net-by-drop-share matrix, break-even odds and
+  deposit, and a one-line if-it-launches net.
+- Remove the separate farm planner tab; the fourth screenshot is now the method
+  and tests page. The board is compact enough for eight rows at 1280x1024.
+- Gate: dashboard source 63,0xx / 65,536; dossier text under cap; verify.mjs all
+  pass; not submitted. The final pick remains v5 at 942,846.

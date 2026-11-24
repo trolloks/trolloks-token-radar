@@ -15,10 +15,11 @@
     <span class="eyebrow">make.fun · token-radar-01</span>
     <h1>Launch <span>Radar</span></h1>
     <p class="tagline">What a protocol's token would be worth if it launched today, priced from the snapshot's own record and tested out of sample.</p>
+    <p class="eqLine">implied = <b>launch value</b> × <b>launch odds</b></p>
   </div>
   <div class="stamp">
     <div><span>Snapshot</span><b id="asOf">—</b></div>
-    <div><span>Model</span><b>radar-v16</b></div>
+    <div><span>Model</span><b>radar-v17</b></div>
     <div><span>Peers priced</span><b id="peerCount">—</b></div>
   </div>
 </header>
@@ -27,7 +28,6 @@
   <a href="#/board" data-tab="board">Radar board</a>
   <a href="#/live" data-tab="live">Live token peers</a>
   <a href="#/method" data-tab="method">Method &amp; tests</a>
-  <a href="#/plan" data-tab="plan">Farm planner</a>
   <a href="#/compare" data-tab="compare">Shortlist <span id="pinNav" class="pill">0</span></a>
 </nav>
 
@@ -59,6 +59,7 @@
     </div>
     <div class="toolbar sub">
       <p id="count" class="count" role="status" aria-live="polite"></p>
+      <div id="verdictChips" class="vchips" aria-label="Farm verdict counts"></div>
       <div class="legend">
         <span><i class="dot v-worth"></i>Worth</span><span><i class="dot v-marginal"></i>Marginal</span><span><i class="dot v-skip"></i>Skip</span>
         <span class="sep"></span><span><i class="chip sample watch">WATCH</i> on the snapshot watchlist</span>
@@ -73,7 +74,7 @@
             <th data-sort="name">Protocol</th>
             <th class="num" data-sort="tvl">TVL</th>
             <th class="num" data-sort="odds">Token odds</th>
-            <th class="num" data-sort="implied">If it launches <small>implied value</small></th>
+            <th class="num" data-sort="implied">Implied value <small>launch × odds</small></th>
             <th class="num" data-sort="p75">P25 – P75</th>
             <th data-sort="verdict">Farm</th>
             <th class="num" data-sort="perHour">Net / hour</th>
@@ -83,7 +84,7 @@
       </table>
       <p id="empty" class="empty" hidden>No protocol matches these filters.</p>
     </div>
-    <p class="footnote">Implied value is the entry's own claim, not a forecast that a token launches. The odds are the peer record's base rate, not a promise. Farm economics assume a $10,000 position, a 7% airdrop share of implied value and a 4% T-bill as the alternative.</p>
+    <p class="footnote">Implied value = launch value × launch odds. The odds are the peer record's base rate, not a promise. Farm economics assume a $10,000 position, a 7% drop share and a 4% T-bill as the alternative.</p>
   </section>
 
   <section id="liveView" hidden>
@@ -121,7 +122,7 @@
         <p class="muted">Lower Brier is better. Each row removes one term from the full model; a term is kept when removing it makes both tests worse. The base rate is the benchmark.</p>
       </article>
     </div>
-    <p class="muted">The older/newer split is a cohort holdout, not a historical forecast. Band coverage is in-sample.</p>
+    <p class="muted">The older/newer split is a cohort holdout, not a historical forecast. Blind coverage is measured on held-out folds; in-sample is 50/80.</p>
     <article class="panel chartWide">
       <h3>Held-out calibration</h3>
       <p class="muted">Every dot is a live-token protocol priced by the value curve that never saw it. The dashed diagonal is a perfect call; colour is the confidence band.</p>
@@ -146,16 +147,6 @@
         <p class="muted source" id="provenance"></p>
       </article>
     </div>
-  </section>
-
-  <section id="planView" hidden>
-    <div class="sectionHead"><h2>Farm planner</h2><p>Put a budget across your shortlist (or the top six by net per hour) and compare the total with the same money in a 4% T-bill.</p></div>
-    <div class="toolbar">
-      <label><span>Budget</span><select id="planBudget"><option value="1000">$1,000</option><option value="10000" selected>$10,000</option><option value="50000">$50,000</option><option value="100000">$100,000</option></select></label>
-      <label><span>Horizon</span><select id="planHorizon"><option value="12" selected>12 weeks</option><option value="26">26 weeks</option><option value="52">52 weeks</option></select></label>
-      <label><span>Include</span><select id="planRisk"><option value="all">Worth + marginal</option><option value="worth">Worth only</option></select></label>
-    </div>
-    <div id="planBody"></div>
   </section>
 
   <section id="compareView" hidden>
